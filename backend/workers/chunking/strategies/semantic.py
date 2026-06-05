@@ -9,6 +9,8 @@ from config import get_settings
 
 settings = get_settings()
 
+_PAGE_MARKER_RE = re.compile(r"<<<PAGE_(\d+)>>>")
+
 
 @dataclass
 class Chunk:
@@ -19,9 +21,16 @@ class Chunk:
 
 
 def _split_sentences(text: str) -> list[str]:
-    # Simple sentence splitter — split on . ! ? followed by whitespace
     sentences = re.split(r"(?<=[.!?])\s+", text)
     return [s.strip() for s in sentences if s.strip()]
+
+
+def _extract_page_number(text: str) -> tuple[str, int]:
+    """Return (cleaned_text, page_number). Page number is the last marker found, defaulting to 1."""
+    markers = _PAGE_MARKER_RE.findall(text)
+    page = int(markers[-1]) if markers else 1
+    clean = _PAGE_MARKER_RE.sub("", text).strip()
+    return clean, page
 
 
 def chunk(text: str) -> list[Chunk]:
@@ -34,25 +43,27 @@ def chunk(text: str) -> list[Chunk]:
         sentence_len = len(sentence)
         if current_len + sentence_len > settings.chunk_size and current_parts:
             chunk_text = " ".join(current_parts)
+            clean_text, page_number = _extract_page_number(chunk_text)
             chunks.append(Chunk(
-                text=chunk_text,
+                text=clean_text,
                 chunk_index=len(chunks),
-                char_count=len(chunk_text),
+                char_count=len(clean_text),
+                page_number=page_number,
             ))
-            # Overlap: keep last sentence for context
             current_parts = current_parts[-1:] if settings.chunk_overlap > 0 else []
             current_len = len(current_parts[0]) if current_parts else 0
 
         current_parts.append(sentence)
-        current_len += sentence_len + 1  # +1 for space
+        current_len += sentence_len + 1
 
-    # Flush remaining
     if current_parts:
         chunk_text = " ".join(current_parts)
+        clean_text, page_number = _extract_page_number(chunk_text)
         chunks.append(Chunk(
-            text=chunk_text,
+            text=clean_text,
             chunk_index=len(chunks),
-            char_count=len(chunk_text),
+            char_count=len(clean_text),
+            page_number=page_number,
         ))
 
     return chunks

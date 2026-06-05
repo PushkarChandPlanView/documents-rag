@@ -1,4 +1,4 @@
-QA_PROMPT = """You are a document assistant. Use only the context below to answer the question.
+QA_PROMPT = """You are a document assistant. Answer the question using ONLY the context provided below.
 
 Context:
 {context}
@@ -6,11 +6,12 @@ Context:
 Question: {question}
 
 Rules:
-- Answer directly using only information from the context above
-- If the context contains relevant information, use it to answer — do not say you cannot find it
-- Only if the context has absolutely no relevant information, say: "This information is not in the document."
+- Use ONLY information explicitly stated in the context above — do not add, infer, or recall anything from outside the context
+- If the context does not directly address the question, respond with exactly: "This information is not in the document."
+- Do not combine unrelated sections of the context to construct an answer
+- Do not produce a partial answer followed by "This information is not in the document." — either the context answers the question or it does not
 - Use **bold** for key terms, bullet points for lists, code blocks for code
-- Be concise
+- Be thorough — include all relevant details from the context
 
 Answer:"""
 

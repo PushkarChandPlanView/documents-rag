@@ -28,7 +28,8 @@ def build_context(chunks: list[RetrievedChunk], token_budget: int | None = None)
 
     for chunk in chunks:
         page_info = f" (page {chunk.page_number})" if chunk.page_number else ""
-        header = f"[Source: document_id={chunk.document_id}{page_info}]"
+        display_name = chunk.document_name or chunk.document_id
+        header = f"[Source: {display_name}{page_info}]"
         chunk_text = f"{header}\n{chunk.text}"
         chunk_tokens = _count_tokens(chunk_text)
 
@@ -40,6 +41,7 @@ def build_context(chunks: list[RetrievedChunk], token_budget: int | None = None)
         sources.append({
             "chunk_id": chunk.chunk_id,
             "document_id": chunk.document_id,
+            "document_name": chunk.document_name,
             "page_number": chunk.page_number,
             "score": round(chunk.score, 4),
         })

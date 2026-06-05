@@ -21,6 +21,7 @@ async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
         "options": {
             "temperature": settings.ollama_temperature,
             "num_ctx": settings.ollama_num_ctx,
+            "num_predict": settings.ollama_num_predict,
         },
     }
     async with httpx.AsyncClient(timeout=300) as client:

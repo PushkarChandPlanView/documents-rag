@@ -15,11 +15,13 @@ class RAGSettings(BaseSettings):
     ollama_llm_model: str = "llama3"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_temperature: float = 0.1
-    ollama_num_ctx: int = 4096
+    ollama_num_ctx: int = 8192
+    ollama_num_predict: int = -1
 
     rag_top_k_retrieve: int = 20
-    rag_top_k_rerank: int = 5
-    rag_context_token_budget: int = 3000
+    rag_top_k_rerank: int = 8
+    rag_min_score: float = 0.40
+    rag_context_token_budget: int = 6000
 
 
 @lru_cache

@@ -3,6 +3,7 @@ Core RAG chain:
   embed query → retrieve chunks → build context → format prompt → stream LLM
 """
 import json
+import logging
 from typing import AsyncGenerator, Optional
 
 from config import get_settings
@@ -10,6 +11,7 @@ from services import context_builder, llm_client, retriever
 from utils.prompt_templates import QA_PROMPT
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 async def run(
@@ -29,11 +31,22 @@ async def run(
         user_id=user_id,
         document_ids=document_ids,
         top_k=settings.rag_top_k_retrieve,
+        query=query,
     )
 
     # 3. Rerank: drop low-confidence chunks, then take top-k
-    MIN_SCORE = 0.50
-    relevant_chunks = [c for c in chunks if c.score >= MIN_SCORE]
+    logger.info(
+        "Retrieved %d chunks for query=%r scores=%s",
+        len(chunks),
+        query,
+        [round(c.score, 3) for c in chunks],
+    )
+    relevant_chunks = [c for c in chunks if c.score >= settings.rag_min_score]
+    logger.info(
+        "%d chunks passed min_score=%.2f threshold",
+        len(relevant_chunks),
+        settings.rag_min_score,
+    )
     top_chunks = relevant_chunks[: settings.rag_top_k_rerank]
 
     # 4. Build context string within token budget

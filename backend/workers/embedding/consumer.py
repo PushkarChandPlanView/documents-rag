@@ -46,7 +46,7 @@ class EmbeddingConsumer(BaseConsumer):
         async with await db_client.get_session() as session:
             result = await session.execute(
                 sql_text(
-                    "SELECT id, chunk_index, text, page_number "
+                    "SELECT id, chunk_index, text, page_number, char_count "
                     "FROM document_chunks WHERE document_id = :doc_id ORDER BY chunk_index"
                 ).bindparams(doc_id=event.document_id)
             )
@@ -55,10 +55,24 @@ class EmbeddingConsumer(BaseConsumer):
         if not rows:
             raise ValueError(f"No chunks found for document_id={doc_id}")
 
+        # Fetch document name and file type
+        async with await db_client.get_session() as session:
+            doc_result = await session.execute(
+                sql_text(
+                    "SELECT filename, file_type FROM documents WHERE id = :doc_id"
+                ).bindparams(doc_id=event.document_id)
+            )
+            doc_row = doc_result.fetchone()
+
+        document_name = doc_row.filename if doc_row else doc_id
+        file_type = doc_row.file_type if doc_row else "unknown"
+
         chunk_ids = [str(row.id) for row in rows]
         chunk_texts = [row.text for row in rows]
         chunk_indices = [row.chunk_index for row in rows]
         page_numbers = [row.page_number for row in rows]
+        char_counts = [row.char_count for row in rows]
+        total_chunks = len(rows)
 
         # Generate embeddings via Ollama
         embeddings = await embed_batch(chunk_texts)
@@ -72,6 +86,10 @@ class EmbeddingConsumer(BaseConsumer):
                 "user_id": str(event.user_id),
                 "chunk_index": chunk_indices[i],
                 "page_number": page_numbers[i] if page_numbers[i] is not None else -1,
+                "document_name": document_name,
+                "file_type": file_type,
+                "char_count": char_counts[i] if char_counts[i] is not None else 0,
+                "total_chunks": total_chunks,
             }
             for i in range(len(chunk_ids))
         ]

@@ -1,13 +1,18 @@
 """
 Map-Reduce summarization for large documents (> 8k tokens).
-1. Map: summarize each chunk independently
+1. Map: summarize each chunk concurrently (Semaphore limits Ollama load)
 2. Reduce: summarize all chunk summaries into a final summary
 """
+import asyncio
+
 import httpx
 
 from config import get_settings
 
 settings = get_settings()
+
+# Max concurrent LLM calls during map phase — lower than embedding (heavier inference)
+CONCURRENCY = 4
 
 CHUNK_PROMPT = """Summarize the following text segment in 2-3 sentences:
 
@@ -39,11 +44,14 @@ async def _summarize_chunk(client: httpx.AsyncClient, text: str) -> str:
 
 
 async def summarize(chunks: list[str]) -> str:
+    sem = asyncio.Semaphore(CONCURRENCY)
+
+    async def _bounded(chunk_text: str) -> str:
+        async with sem:
+            return await _summarize_chunk(client, chunk_text)
+
     async with httpx.AsyncClient(timeout=600) as client:
-        chunk_summaries = []
-        for chunk_text in chunks:
-            summary = await _summarize_chunk(client, chunk_text)
-            chunk_summaries.append(summary)
+        chunk_summaries = await asyncio.gather(*[_bounded(c) for c in chunks])
 
         combined = "\n\n".join(f"- {s}" for s in chunk_summaries)
         resp = await client.post(

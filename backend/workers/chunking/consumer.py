@@ -55,22 +55,24 @@ class ChunkingConsumer(BaseConsumer):
 
         logger.info("Created %d chunks using strategy=%s for document_id=%s", len(chunks), strategy, doc_id)
 
-        # Bulk insert chunks into PostgreSQL
+        # Bulk insert all chunks in a single query
+        params: dict = {"document_id": event.document_id}
+        placeholders = []
+        for i, chunk in enumerate(chunks):
+            params[f"id{i}"] = uuid.uuid4()
+            params[f"ci{i}"] = chunk.chunk_index
+            params[f"t{i}"] = chunk.text
+            params[f"cc{i}"] = chunk.char_count
+            params[f"pn{i}"] = chunk.page_number
+            placeholders.append(f"(:id{i}, :document_id, :ci{i}, :t{i}, :cc{i}, :pn{i})")
+
         async with await db_client.get_session() as session:
-            for chunk in chunks:
-                await session.execute(
-                    sql_text(
-                        "INSERT INTO document_chunks (id, document_id, chunk_index, text, char_count, page_number) "
-                        "VALUES (:id, :document_id, :chunk_index, :text, :char_count, :page_number)"
-                    ).bindparams(
-                        id=uuid.uuid4(),
-                        document_id=event.document_id,
-                        chunk_index=chunk.chunk_index,
-                        text=chunk.text,
-                        char_count=chunk.char_count,
-                        page_number=chunk.page_number,
-                    )
-                )
+            await session.execute(
+                sql_text(
+                    "INSERT INTO document_chunks (id, document_id, chunk_index, text, char_count, page_number) "
+                    "VALUES " + ", ".join(placeholders)
+                ).bindparams(**params)
+            )
             await session.execute(
                 sql_text(
                     "UPDATE processing_jobs SET status = 'COMPLETED', completed_at = now() "
