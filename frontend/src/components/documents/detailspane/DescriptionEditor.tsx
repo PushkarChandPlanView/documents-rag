@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Textarea } from "@planview/pv-uikit";
+import { Textarea } from "@planview/pv-form";
 import { useUpdateDescription } from "@/hooks/useDocuments";
 
 interface DescriptionEditorProps {
@@ -27,6 +27,7 @@ export function DescriptionEditor({ itemId, itemType, value }: DescriptionEditor
 
   return (
     <Textarea
+      label="Description"
       value={draft}
       onChange={(val) => setDraft(val)}
       onBlur={handleBlur}

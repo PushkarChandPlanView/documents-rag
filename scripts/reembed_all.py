@@ -7,21 +7,20 @@ USAGE:
 
 PURPOSE:
     Run this once after changing OLLAMA_EMBED_MODEL in .env (e.g. nomic-embed-text
-    → mxbai-embed-large). The new model produces 1024-dim vectors, which are
-    INCOMPATIBLE with existing 768-dim vectors in ChromaDB. This script:
+    → mxbai-embed-large) or when migrating from ChromaDB to pgvector.
+    This script:
 
-      1. Drops the existing ChromaDB collection (removes all stale vectors)
-      2. Queries ALL document chunks from PostgreSQL
-      3. Groups chunks by document and re-embeds with contextual prefixes
+      1. Queries ALL document chunks from PostgreSQL
+      2. Groups chunks by document and re-embeds with contextual prefixes
          (mirrors the logic in backend/workers/embedding/consumer.py)
-      4. Writes new vectors to a fresh ChromaDB collection using upsert
+      3. Upserts new vectors into the `document_embeddings` table in PostgreSQL
          (idempotent — safe to re-run after a partial failure)
 
 PREREQUISITES:
-    pip install psycopg2-binary chromadb httpx tiktoken python-dotenv
+    pip install psycopg2-binary httpx tiktoken python-dotenv
 
-    The new Ollama model must already be pulled:
-        docker exec document-summarizer-ollama-1 ollama pull mxbai-embed-large
+    The Ollama model must already be pulled:
+        docker exec document-summarizer-ollama-1 ollama pull nomic-embed-text
 
     Stop the embedding worker first to prevent concurrent writes:
         docker compose stop worker_embedding
@@ -30,9 +29,15 @@ PREREQUISITES:
         python scripts/reembed_all.py --dry-run   # verify counts
         python scripts/reembed_all.py             # live migration
 
+    NOTE: If the vector dimension of your new model differs from the current
+    `document_embeddings.embedding` column dimension, run this first:
+        ALTER TABLE document_embeddings ALTER COLUMN embedding TYPE vector(<new_dim>);
+        DROP INDEX IF EXISTS document_embeddings_embedding_idx;
+        CREATE INDEX document_embeddings_embedding_idx
+            ON document_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
 PORTS (host-mapped, per docker-compose.yml):
     PostgreSQL → localhost:5433
-    ChromaDB   → localhost:8083
     Ollama     → localhost:11434
 """
 import argparse
@@ -63,14 +68,11 @@ def _pg_url() -> str:
 
 
 POSTGRES_URL        = _pg_url()
-CHROMA_HOST         = os.getenv("CHROMA_HOST", "chroma").replace("chroma", "localhost")
-CHROMA_PORT         = 8083 if os.getenv("CHROMA_HOST", "") == "chroma" else int(os.getenv("CHROMA_PORT", "8083"))
-CHROMA_COLLECTION   = os.getenv("CHROMA_COLLECTION", "document_chunks")
 OLLAMA_BASE_URL     = (
     os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     .replace("ollama:11434", "localhost:11434")               # remap docker hostname
 )
-OLLAMA_EMBED_MODEL  = os.getenv("OLLAMA_EMBED_MODEL", "mxbai-embed-large")
+OLLAMA_EMBED_MODEL  = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 CONCURRENCY         = 8  # matches ollama_embedder.py
 
 logging.basicConfig(
@@ -130,32 +132,53 @@ def fetch_all_chunks() -> list[dict]:
         conn.close()
 
 
-# ── ChromaDB ──────────────────────────────────────────────────────────────────
+def upsert_embeddings_sync(conn, rows: list[dict]) -> None:
+    """Insert or update a batch of embedding rows into document_embeddings."""
+    import psycopg2.extras
+    with conn.cursor() as cur:
+        for row in rows:
+            embedding_str = "[" + ",".join(str(x) for x in row["embedding"]) + "]"
+            cur.execute(
+                """
+                INSERT INTO document_embeddings
+                    (chunk_id, document_id, user_id, chunk_index, page_number,
+                     document_name, file_type, char_count, token_count, total_chunks,
+                     embedding)
+                VALUES
+                    (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                    embedding     = EXCLUDED.embedding,
+                    chunk_index   = EXCLUDED.chunk_index,
+                    page_number   = EXCLUDED.page_number,
+                    document_name = EXCLUDED.document_name,
+                    file_type     = EXCLUDED.file_type,
+                    char_count    = EXCLUDED.char_count,
+                    token_count   = EXCLUDED.token_count,
+                    total_chunks  = EXCLUDED.total_chunks
+                """,
+                (
+                    str(row["chunk_id"]),
+                    str(row["document_id"]),
+                    str(row["user_id"]),
+                    row["chunk_index"],
+                    row.get("page_number"),
+                    row.get("document_name", ""),
+                    row.get("file_type", ""),
+                    row.get("char_count", 0),
+                    row.get("token_count", 0),
+                    row.get("total_chunks", 0),
+                    embedding_str,
+                ),
+            )
+    conn.commit()
 
-def get_chroma_client():
-    import chromadb
-    from chromadb.config import Settings as ChromaSettings
-    return chromadb.HttpClient(
-        host=CHROMA_HOST,
-        port=CHROMA_PORT,
-        settings=ChromaSettings(anonymized_telemetry=False),
-    )
 
-
-def drop_and_recreate_collection(client):
-    """Delete existing collection and return a fresh one with cosine distance."""
-    try:
-        client.delete_collection(CHROMA_COLLECTION)
-        logger.info("Deleted existing collection '%s'", CHROMA_COLLECTION)
-    except Exception as exc:
-        logger.warning("Could not delete collection (may not exist yet): %s", exc)
-
-    collection = client.get_or_create_collection(
-        name=CHROMA_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
-    logger.info("Created fresh collection '%s'", CHROMA_COLLECTION)
-    return collection
+def delete_all_embeddings(conn) -> None:
+    """Wipe all rows from document_embeddings (equivalent to dropping a Chroma collection)."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM document_embeddings")
+    conn.commit()
+    logger.info("Cleared document_embeddings table")
 
 
 # ── Migration logic ───────────────────────────────────────────────────────────
@@ -167,8 +190,8 @@ def group_by_document(rows: list[dict]) -> dict[str, list[dict]]:
     return groups
 
 
-async def reembed_document(collection, doc_id: str, chunks: list[dict], dry_run: bool) -> int:
-    """Embed all chunks for one document and upsert into ChromaDB. Returns vector count."""
+async def reembed_document(conn, doc_id: str, chunks: list[dict], dry_run: bool) -> int:
+    """Embed all chunks for one document and upsert into pgvector. Returns vector count."""
     total         = len(chunks)
     document_name = chunks[0]["document_name"] or doc_id
     file_type     = chunks[0]["file_type"] or "unknown"
@@ -185,35 +208,32 @@ async def reembed_document(collection, doc_id: str, chunks: list[dict], dry_run:
 
     embeddings = await embed_batch(contextualized)
 
-    metadatas = [
+    rows = [
         {
-            "document_id": doc_id,
-            "user_id": str(chunks[i]["user_id"]),
-            "chunk_index": chunks[i]["chunk_index"],
-            "page_number": chunks[i]["page_number"] if chunks[i]["page_number"] is not None else -1,
+            "chunk_id":      str(chunks[i]["id"]),
+            "document_id":   doc_id,
+            "user_id":       str(chunks[i]["user_id"]),
+            "chunk_index":   chunks[i]["chunk_index"],
+            "page_number":   chunks[i]["page_number"],
             "document_name": document_name,
-            "file_type": file_type,
-            "char_count": chunks[i]["char_count"] if chunks[i]["char_count"] is not None else 0,
-            "token_count": len(_enc.encode(chunk_texts[i])),
-            "total_chunks": total,
+            "file_type":     file_type,
+            "char_count":    chunks[i]["char_count"] if chunks[i]["char_count"] is not None else 0,
+            "token_count":   len(_enc.encode(chunk_texts[i])),
+            "total_chunks":  total,
+            "embedding":     embeddings[i],
         }
         for i in range(total)
     ]
 
     # upsert is idempotent — re-running after a partial failure is safe
-    collection.upsert(
-        ids=[str(c["id"]) for c in chunks],
-        embeddings=embeddings,
-        documents=chunk_texts,   # original text, not the prefixed version
-        metadatas=metadatas,
-    )
+    upsert_embeddings_sync(conn, rows)
     return total
 
 
 async def run(dry_run: bool, batch_size: int) -> None:
-    logger.info("=== Re-embedding migration ===")
+    import psycopg2
+    logger.info("=== Re-embedding migration (pgvector) ===")
     logger.info("Model:      %s", OLLAMA_EMBED_MODEL)
-    logger.info("ChromaDB:   %s:%s / collection=%s", CHROMA_HOST, CHROMA_PORT, CHROMA_COLLECTION)
     logger.info("PostgreSQL: %s", POSTGRES_URL.split("@")[-1])   # hide credentials
     logger.info("Dry run:    %s", dry_run)
 
@@ -230,31 +250,36 @@ async def run(dry_run: bool, batch_size: int) -> None:
     by_doc = group_by_document(rows)
     logger.info("Found %d documents to re-embed", len(by_doc))
 
-    # 2. Drop and recreate ChromaDB collection
+    # 2. Open a persistent psycopg2 connection for upserts
     if not dry_run:
-        chroma = get_chroma_client()
-        collection = drop_and_recreate_collection(chroma)
+        conn = psycopg2.connect(POSTGRES_URL)
+        logger.info("Clearing existing embeddings from document_embeddings...")
+        delete_all_embeddings(conn)
     else:
-        collection = None
-        logger.info("[DRY RUN] Skipping ChromaDB collection reset")
+        conn = None
+        logger.info("[DRY RUN] Skipping embedding table reset")
 
     # 3. Re-embed document by document
     total_vectors = 0
     doc_ids = list(by_doc.keys())
 
-    for batch_start in range(0, len(doc_ids), batch_size):
-        batch = doc_ids[batch_start: batch_start + batch_size]
-        for doc_id in batch:
-            try:
-                count = await reembed_document(collection, doc_id, by_doc[doc_id], dry_run)
-                total_vectors += count
-            except Exception as exc:
-                logger.error("Failed on document_id=%s: %s", doc_id, exc)
-                if not dry_run:
-                    raise  # abort to avoid partial state
+    try:
+        for batch_start in range(0, len(doc_ids), batch_size):
+            batch = doc_ids[batch_start: batch_start + batch_size]
+            for doc_id in batch:
+                try:
+                    count = await reembed_document(conn, doc_id, by_doc[doc_id], dry_run)
+                    total_vectors += count
+                except Exception as exc:
+                    logger.error("Failed on document_id=%s: %s", doc_id, exc)
+                    if not dry_run:
+                        raise  # abort to avoid partial state
 
-        completed = min(batch_start + batch_size, len(doc_ids))
-        logger.info("Progress: %d/%d documents | %d vectors embedded", completed, len(doc_ids), total_vectors)
+            completed = min(batch_start + batch_size, len(doc_ids))
+            logger.info("Progress: %d/%d documents | %d vectors embedded", completed, len(doc_ids), total_vectors)
+    finally:
+        if conn:
+            conn.close()
 
     action = "[DRY RUN] Would write" if dry_run else "Wrote"
     logger.info("=== Done: %s %d vectors across %d documents ===", action, total_vectors, len(doc_ids))
@@ -267,7 +292,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Count chunks and verify connectivity without writing to ChromaDB",
+        help="Count chunks and verify connectivity without writing to pgvector",
     )
     parser.add_argument(
         "--batch-size", type=int, default=20,

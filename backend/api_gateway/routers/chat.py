@@ -28,13 +28,18 @@ async def _stream_rag_response(
         "document_ids": [str(d) for d in document_ids] if document_ids else None,
         "conversation_id": conversation_id,
     }
-    async with httpx.AsyncClient(timeout=300) as client:
+    client = httpx.AsyncClient(timeout=300)
+    try:
         async with client.stream("POST", f"{settings.rag_service_url}/query", json=payload) as resp:
             if resp.status_code != 200:
                 yield b"data: [ERROR] RAG service unavailable\n\n"
                 return
             async for chunk in resp.aiter_bytes():
                 yield chunk
+    except (httpx.RemoteProtocolError, httpx.ReadTimeout) as exc:
+        logger.warning("RAG stream ended early: %s", exc)
+    finally:
+        await client.aclose()
 
 
 @router.post("/chat")

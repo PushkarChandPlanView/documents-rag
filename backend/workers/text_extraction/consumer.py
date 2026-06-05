@@ -111,7 +111,7 @@ async def _get_source_url(document_id) -> str | None:
     from sqlalchemy import select, text as sql_text
     async with await db_client.get_session() as session:
         result = await session.execute(
-            sql_text("SELECT source_url FROM items WHERE id = :doc_id").bindparams(doc_id=document_id)
+            sql_text("SELECT source_url FROM documents WHERE id = :doc_id").bindparams(doc_id=document_id)
         )
         row = result.fetchone()
         return row[0] if row else None

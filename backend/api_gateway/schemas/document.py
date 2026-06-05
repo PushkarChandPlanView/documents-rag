@@ -1,10 +1,10 @@
 import base64
 import json
 from datetime import datetime
-from typing import Annotated, Literal, Optional, Union
+from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, HttpUrl
 
 
 class ProcessingJobResponse(BaseModel):
@@ -18,42 +18,33 @@ class ProcessingJobResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Unified list items ────────────────────────────────────────────────────────
+# ── Unified item (folders and documents share one shape) ─────────────────────
 
-class FolderItem(BaseModel):
-    type: Literal["folder"] = "folder"
+class Item(BaseModel):
+    type: Literal["folder", "document"]
     id: UUID
     name: str
     description: Optional[str] = None
     parent_id: Optional[UUID] = None
-    created_at: datetime
-    updated_at: datetime
-
-
-class DocumentItem(BaseModel):
-    type: Literal["document"] = "document"
-    id: UUID
-    filename: str          # mapped from items.name
-    description: Optional[str] = None
-    mime_type: str
-    file_size_bytes: int
-    status: str
-    folder_id: Optional[UUID] = None    # mapped from items.parent_id
-    folder_name: Optional[str] = None
+    parent_name: Optional[str] = None
+    # Document-only (None for folders)
+    mime_type: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    status: Optional[str] = None
     source_url: Optional[str] = None
+    processing_jobs: list[ProcessingJobResponse] = []
     created_at: datetime
     updated_at: datetime
-    processing_jobs: list[ProcessingJobResponse] = []
 
 
-UnifiedItem = Annotated[
-    Union[FolderItem, DocumentItem],
-    Field(discriminator="type"),
-]
+# Backward-compat aliases
+FolderItem = Item
+DocumentItem = Item
+UnifiedItem = Item
 
 
 class UnifiedListResponse(BaseModel):
-    items: list[Union[FolderItem, DocumentItem]]
+    items: list[Item]
     next_cursor: Optional[str] = None
     has_more: bool = False
 

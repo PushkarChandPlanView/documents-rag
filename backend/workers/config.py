@@ -30,11 +30,6 @@ class WorkerSettings(BaseSettings):
     kafka_consumer_group_embedding: str = "embedding-workers"
     kafka_consumer_group_summarization: str = "summarization-workers"
 
-    # ChromaDB
-    chroma_host: str = "chroma"
-    chroma_port: int = 8000
-    chroma_collection: str = "document_chunks"
-
     # Ollama
     ollama_base_url: str = "http://ollama:11434"
     ollama_llm_model: str = "llama3"

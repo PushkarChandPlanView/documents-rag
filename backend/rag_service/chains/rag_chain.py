@@ -29,8 +29,8 @@ async def run(
     yield _status("Searching documents…")
     query_embedding = await llm_client.embed(query)
 
-    # 2. Retrieve top-k chunks from ChromaDB
-    chunks = retriever.retrieve(
+    # 2. Retrieve top-k chunks from pgvector
+    chunks = await retriever.retrieve(
         query_embedding=query_embedding,
         user_id=user_id,
         document_ids=document_ids,

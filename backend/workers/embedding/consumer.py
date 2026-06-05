@@ -2,7 +2,7 @@
 Embedding Worker
 Consumes: document_chunked
 Publishes: embeddings_generated
-Writes to: ChromaDB
+Writes to: pgvector (PostgreSQL document_embeddings table)
 """
 import logging
 from uuid import UUID
@@ -14,7 +14,7 @@ from sqlalchemy import text as sql_text
 from base.base_consumer import BaseConsumer
 from base.base_producer import publish
 from config import get_settings
-from shared import chroma_client, db_client
+from shared import pgvector_client, db_client
 from shared.schemas import DocumentChunkedEvent, EmbeddingsGeneratedEvent, Topics
 from .ollama_embedder import embed_batch
 
@@ -62,7 +62,7 @@ class EmbeddingConsumer(BaseConsumer):
         async with await db_client.get_session() as session:
             doc_result = await session.execute(
                 sql_text(
-                    "SELECT name, mime_type FROM items WHERE id = :doc_id"
+                    "SELECT name, mime_type FROM documents WHERE id = :doc_id"
                 ).bindparams(doc_id=event.document_id)
             )
             doc_row = doc_result.fetchone()
@@ -92,28 +92,24 @@ class EmbeddingConsumer(BaseConsumer):
         # Compute token counts on original chunk texts (what the LLM will read)
         token_counts = [len(_enc.encode(t)) for t in chunk_texts]
 
-        # Write to ChromaDB — store ORIGINAL chunk text, not the prefixed version
-        collection = chroma_client.get_or_create_collection()
-        metadatas = [
+        # Write to pgvector — store ORIGINAL chunk text, not the prefixed version
+        rows = [
             {
-                "document_id": doc_id,
-                "user_id": str(event.user_id),
-                "chunk_index": chunk_indices[i],
-                "page_number": page_numbers[i] if page_numbers[i] is not None else -1,
+                "chunk_id":      chunk_ids[i],
+                "document_id":   doc_id,
+                "user_id":       str(event.user_id),
+                "chunk_index":   chunk_indices[i],
+                "page_number":   page_numbers[i] if page_numbers[i] is not None else None,
                 "document_name": document_name,
-                "file_type": file_type,
-                "char_count": char_counts[i] if char_counts[i] is not None else 0,
-                "token_count": token_counts[i],
-                "total_chunks": total_chunks,
+                "file_type":     file_type,
+                "char_count":    char_counts[i] if char_counts[i] is not None else 0,
+                "token_count":   token_counts[i],
+                "total_chunks":  total_chunks,
+                "embedding":     embeddings[i],
             }
             for i in range(len(chunk_ids))
         ]
-        collection.add(
-            ids=chunk_ids,
-            embeddings=embeddings,
-            documents=chunk_texts,
-            metadatas=metadatas,
-        )
+        await pgvector_client.upsert_embeddings(rows)
 
         async with await db_client.get_session() as session:
             await session.execute(

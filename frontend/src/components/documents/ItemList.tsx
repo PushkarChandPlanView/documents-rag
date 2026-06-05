@@ -14,7 +14,7 @@ import {
   Link,
   Trash,
 } from "@planview/pv-icons";
-import { useDeleteDocument, useDeleteFolder, useDocuments, useUpdateItemName } from "@/hooks/useDocuments";
+import { useDeleteDocument, useDeleteFolder, useDocuments } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
 import type { ItemFiltersState } from "./ItemFilters";
 
@@ -139,9 +139,9 @@ function unifiedToRows(items: UnifiedItem[], rootFolderId?: string): DocRow[] {
         id: item.id,
         parentId,
         index: i,
-        name: item.filename,
-        fileType: getMimeLabel(item.mime_type),
-        size: formatBytes(item.file_size_bytes),
+        name: item.name,
+        fileType: getMimeLabel(item.mime_type ?? ""),
+        size: formatBytes(item.file_size_bytes ?? 0),
         status: resolveStatus(item),
         uploadedAt: new Date(item.created_at).toLocaleDateString(),
         _doc: item,
@@ -208,7 +208,7 @@ function resolveStatus(doc: DocumentItem): string {
     const active = doc.processing_jobs.find((j) => j.status === "IN_PROGRESS");
     if (active) return STAGE_LABELS[active.stage] ?? active.stage;
   }
-  return doc.status;
+  return doc.status ?? "PENDING";
 }
 
 const Badge = styled.span<{ $status: string }>`
@@ -250,7 +250,6 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useDocuments(parentId);
   const { mutate: deleteDoc } = useDeleteDocument();
   const { mutate: deleteFolder } = useDeleteFolder();
-  const { mutate: updateName } = useUpdateItemName();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [initialised, setInitialised] = useState(false);
 
@@ -270,8 +269,8 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           .filter((r) => r.parentId !== null && r._doc)
           .filter((r) => {
             const doc = r._doc!;
-            if (filters.statuses.size && !filters.statuses.has(doc.status)) return false;
-            if (allowedMimes && !allowedMimes.has(doc.mime_type)) return false;
+            if (filters.statuses.size && (!doc.status || !filters.statuses.has(doc.status))) return false;
+            if (allowedMimes && (!doc.mime_type || !allowedMimes.has(doc.mime_type))) return false;
             return true;
           })
           .map((r) => r.id),
@@ -305,20 +304,19 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
         width: 400,
         resizable: true,
         cell: {
-          editable: true,
           Renderer: ({ value, rowId, tabIndex }) => {
             const row = gridData.data.get(String(rowId));
             if (!row?._doc) {
               return (
                 <GridCellBase tabIndex={tabIndex}>
                   <IconWrapper>
+                    <Folder />
                     <span
-                      style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }}
+                      style={{ fontWeight: 600, cursor: "pointer", color: "#1a73e8" }}
                       onClick={(e) => { e.stopPropagation(); onFolderOpen?.(row!.id); }}
                     >
-                      <Folder />
+                      {value}
                     </span>
-                    <span style={{ fontWeight: 600 }}>{value}</span>
                   </IconWrapper>
                 </GridCellBase>
               );
@@ -326,7 +324,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
             return (
               <GridCellBase tabIndex={tabIndex}>
                 <IconWrapper>
-                  {getMimeIcon(row._doc.mime_type)}
+                  {getMimeIcon(row._doc.mime_type ?? "")}
                   <span style={{ color: row.status === "COMPLETED" ? "#1a73e8" : "inherit" }}>{value}</span>
                 </IconWrapper>
               </GridCellBase>
@@ -410,16 +408,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
             const row = gridData.data.get(String(rowId));
             if (!row) return;
             if (row._doc) onSelect(row._doc);
-            else if (row._folder) onFolderOpen?.(row._folder.id);
-          }}
-          onCellChange={(payload) => {
-            if (payload.columnId !== "name") return;
-            const row = gridData.data.get(String(payload.rowId));
-            if (!row) return;
-            const newName = String(payload.nextValue ?? "").trim();
-            if (newName && newName !== row.name) {
-              updateName({ id: row.id, type: row._doc ? "document" : "folder", name: newName });
-            }
+            else if (row._folder) onSelect(row._folder);
           }}
           actionsMenu={({ row }) => (
             <ListItem

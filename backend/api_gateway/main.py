@@ -3,14 +3,26 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from config import get_settings
+from dependencies import AsyncSessionLocal, engine
+from models.user import User
 from routers import auth, chat, documents, folders, health
-from services import kafka_producer, storage_service
+from services import auth_service, kafka_producer, storage_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+async def _auto_seed() -> None:
+    """Create the default admin user if no users exist (fresh database)."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).limit(1))
+        if result.scalar_one_or_none() is None:
+            user = await auth_service.create_user(db, "admin@example.com", "changeme")
+            logger.info("Auto-seeded default user: %s", user.email)
 
 
 @asynccontextmanager
@@ -25,6 +37,9 @@ async def lifespan(app: FastAPI):
     # Start Kafka producer
     await kafka_producer.get_producer()
     logger.info("Kafka producer ready.")
+
+    # Seed default user on fresh database
+    await _auto_seed()
 
     yield
 

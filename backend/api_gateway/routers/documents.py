@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import get_settings
 from dependencies import get_current_user, get_db
 from models.user import User
-from schemas.document import DocumentDetailResponse, DocumentItem, ItemUpdateRequest, LinkCreateRequest, UnifiedListResponse, UploadResponse
-from services import item_service, kafka_producer, storage_service
+from schemas.document import DocumentDetailResponse, Item, ItemUpdateRequest, LinkCreateRequest, UnifiedListResponse, UploadResponse
+from services import document_service as item_service, kafka_producer, storage_service
 from schemas.kafka_events import DocumentUploadedEvent, LinkAddedEvent, Topics
 
 logger = logging.getLogger(__name__)
@@ -163,7 +163,7 @@ async def get_document(
     return detail
 
 
-@router.patch("/{document_id}", response_model=DocumentItem)
+@router.patch("/{document_id}", response_model=Item)
 async def update_document(
     document_id: UUID,
     body: ItemUpdateRequest,
@@ -182,7 +182,36 @@ async def update_document(
     )
     if not item or item.type != "document":
         raise HTTPException(status_code=404, detail="Document not found")
-    return item_service._to_document_item(item)
+    return item_service._to_item(item)
+
+
+@router.post("/{document_id}/reprocess", status_code=status.HTTP_202_ACCEPTED)
+async def reprocess_document(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reset processing state and re-trigger the pipeline from scratch."""
+    item = await item_service.reprocess_document(db, document_id, current_user.id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    event = DocumentUploadedEvent(
+        document_id=item.id,
+        user_id=current_user.id,
+        minio_key=item.minio_key or "",
+        filename=item.name,
+        mime_type=item.mime_type or "",
+        file_size_bytes=item.file_size_bytes or 0,
+        uploaded_at=datetime.now(timezone.utc),
+    )
+    await kafka_producer.publish(
+        topic=Topics.DOCUMENT_UPLOADED,
+        payload=event.to_json(),
+        key=str(item.id),
+    )
+    logger.info("Reprocess triggered: document_id=%s user_id=%s", item.id, current_user.id)
+    return {"status": "reprocessing"}
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

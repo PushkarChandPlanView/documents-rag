@@ -11,7 +11,6 @@ networks:
 
 volumes:
   postgres_data:
-  chroma_data:
   minio_data:
   ollama_models:
   kafka_data:
@@ -24,7 +23,7 @@ services:
   # ─────────────────────────────────────────────────────────────────────────
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-docstore}
@@ -143,29 +142,6 @@ services:
     entrypoint: ["/bin/sh", "/init-buckets.sh"]
     restart: "no"
 
-  chroma:
-    image: chromadb/chroma:0.5.0
-    restart: unless-stopped
-    environment:
-      IS_PERSISTENT: "TRUE"
-      PERSIST_DIRECTORY: /chroma/chroma
-      ANONYMIZED_TELEMETRY: "FALSE"
-    volumes:
-      - chroma_data:/chroma/chroma
-    ports:
-      - "127.0.0.1:8083:8000"
-    networks: [internal]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 2G
-
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
@@ -177,7 +153,7 @@ services:
       OLLAMA_KEEP_ALIVE: "24h"
       OLLAMA_NUM_PARALLEL: "4"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "ollama", "list"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -189,6 +165,21 @@ services:
           memory: 8G
         reservations:
           memory: 4G
+
+  ollama-init:
+    image: ollama/ollama:latest
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./infrastructure/ollama/pull-models.sh:/pull-models.sh:ro
+    entrypoint: ["/bin/bash", "/pull-models.sh"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    env_file: .env
+    networks: [internal]
 
   # ─────────────────────────────────────────────────────────────────────────
   # Backend Services
@@ -284,10 +275,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      chroma:
-        condition: service_healthy
-      ollama:
-        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
     networks: [internal]
@@ -311,8 +300,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
     networks: [internal]
@@ -330,10 +319,8 @@ services:
     restart: unless-stopped
     <<: *common-env
     depends_on:
-      chroma:
-        condition: service_healthy
-      ollama:
-        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     networks: [internal]

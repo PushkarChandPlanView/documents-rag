@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { DetailsPanel, DetailsPanelSection } from "@planview/pv-details";
-import { AssistedChat, Info } from "@planview/pv-icons";
+import { AiAnvi, Info, Refresh } from "@planview/pv-icons";
+import { ButtonEmpty } from "@planview/pv-uikit";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { DescriptionEditor } from "./DescriptionEditor";
+import { useReprocessDocument } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
+import { NameField } from "./NameField";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +65,7 @@ interface ItemDetailsPaneProps {
   onClose: () => void;
 }
 
-export function ItemDetailsPane({ item, activeTab: externalTab = "details", onClose }: ItemDetailsPaneProps) {
+export function DetailsPane({ item, activeTab: externalTab = "details", onClose }: ItemDetailsPaneProps) {
   const [activeTab, setActiveTab] = useState<string>(externalTab);
 
   useEffect(() => {
@@ -73,15 +76,17 @@ export function ItemDetailsPane({ item, activeTab: externalTab = "details", onCl
   const doc = isDoc ? (item as DocumentItem) : null;
   const folder = !isDoc ? (item as FolderItem) : null;
   const canChat = !!doc && doc.status === "COMPLETED";
+  const canReprocess = !!doc && (doc.status === "FAILED" || doc.status === "PROCESSING");
+  const { mutate: reprocess, isPending: reprocessing } = useReprocessDocument();
 
   const tabs = [
     { id: "details", label: "Details", icon: <Info /> },
-    ...(canChat ? [{ id: "chat", label: "Chat", icon: <AssistedChat /> }] : []),
+    ...(canChat ? [{ id: "chat", label: "Chat", icon: <AiAnvi color="anvi" /> }] : []),
   ];
 
   return (
     <DetailsPanel
-      header={doc ? doc.filename : folder!.name}
+      header={item.name}
       onClose={onClose}
       tabs={tabs}
       activeTab={activeTab}
@@ -90,6 +95,7 @@ export function ItemDetailsPane({ item, activeTab: externalTab = "details", onCl
       {activeTab === "details" && (
         <>
           <DetailsPanelSection label="Description">
+            <NameField itemId={item.id} itemType={isDoc ? "document" : "folder"} value={item.name} />
             <DescriptionEditor
               itemId={item.id}
               itemType={isDoc ? "document" : "folder"}
@@ -108,15 +114,30 @@ export function ItemDetailsPane({ item, activeTab: externalTab = "details", onCl
                   <MetaValue>{doc.mime_type}</MetaValue>
 
                   <MetaLabel>Size</MetaLabel>
-                  <MetaValue>{formatBytes(doc.file_size_bytes)}</MetaValue>
+                  <MetaValue>{doc.file_size_bytes !== null ? formatBytes(doc.file_size_bytes) : 'N/A'}</MetaValue>
 
                   <MetaLabel>Status</MetaLabel>
                   <MetaValue>{doc.status}</MetaValue>
 
-                  {doc.folder_name && (
+                  {canReprocess && (
+                    <>
+                      <MetaLabel />
+                      <MetaValue>
+                        <ButtonEmpty
+                          icon={<Refresh />}
+                          onClick={() => reprocess(doc!.id)}
+                          disabled={reprocessing}
+                        >
+                          {reprocessing ? "Reprocessing…" : "Reprocess"}
+                        </ButtonEmpty>
+                      </MetaValue>
+                    </>
+                  )}
+
+                  {item.parent_name && (
                     <>
                       <MetaLabel>Folder</MetaLabel>
-                      <MetaValue>{doc.folder_name}</MetaValue>
+                      <MetaValue>{item.parent_name}</MetaValue>
                     </>
                   )}
 
@@ -150,7 +171,7 @@ export function ItemDetailsPane({ item, activeTab: externalTab = "details", onCl
 
       {activeTab === "chat" && canChat && (
         <ChatFill>
-          <ChatWindow documentId={doc!.id} documentName={doc!.filename} />
+          <ChatWindow documentId={doc!.id} documentName={doc!.name} />
         </ChatFill>
       )}
     </DetailsPanel>

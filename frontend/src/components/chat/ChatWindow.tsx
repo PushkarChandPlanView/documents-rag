@@ -3,6 +3,7 @@ import styled from "styled-components";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { streamChat } from "@/api/chat";
+import { documentsApi } from "@/api/documents";
 import type { ChatMessage } from "@/types";
 
 // ── Markdown elements ────────────────────────────────────────────────────────
@@ -228,10 +229,28 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // When the selected document changes, reset chat and show its summary
   useEffect(() => {
     setMessages([]);
     setInput("");
     setStreaming(false);
+
+    if (!documentId) return;
+
+    documentsApi.get(documentId).then((doc) => {
+      if (doc.summary) {
+        setMessages([
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `**Document Summary**\n\n${doc.summary}`,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    }).catch(() => {
+      // silently ignore — chat still works without a summary
+    });
   }, [documentId]);
 
   useEffect(() => {
@@ -313,7 +332,7 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
         {messages.length === 0 && (
           <EmptyHint>
             {documentName
-              ? `Ask a question about "${documentName}"...`
+              ? `Loading summary for "${documentName}"...`
               : "Ask a question about your documents..."}
           </EmptyHint>
         )}

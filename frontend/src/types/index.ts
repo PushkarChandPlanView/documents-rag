@@ -13,38 +13,34 @@ export interface ProcessingJob {
   completed_at: string | null;
 }
 
-// ── Unified list items (from GET /documents) ──────────────────────────────────
+// ── Unified item (folders and documents share one shape) ─────────────────────
 
-export interface FolderItem {
-  type: "folder";
+export interface Item {
+  filename: string;
+  folder_id: null;
+  type: "folder" | "document";
   id: string;
   name: string;
   description: string | null;
   parent_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DocumentItem {
-  type: "document";
-  id: string;
-  filename: string;        // mapped from items.name
-  description: string | null;
-  mime_type: string;
-  file_size_bytes: number;
-  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
-  folder_id: string | null;
-  folder_name: string | null;
+  parent_name: string | null;
+  // document-only (null for folders)
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | null;
   source_url: string | null;
+  processing_jobs: ProcessingJob[];
   created_at: string;
   updated_at: string;
-  processing_jobs: ProcessingJob[];
 }
 
-export type UnifiedItem = FolderItem | DocumentItem;
+// Backward-compat aliases
+export type FolderItem = Item;
+export type DocumentItem = Item;
+export type UnifiedItem = Item;
 
 export interface UnifiedListResponse {
-  items: UnifiedItem[];
+  items: Item[];
   next_cursor: string | null;
   has_more: boolean;
 }

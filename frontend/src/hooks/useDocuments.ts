@@ -108,6 +108,15 @@ export function useUpdateItemName() {
   });
 }
 
+export function useReprocessDocument() {
+  return useMutation({
+    mutationFn: (id: string) => documentsApi.reprocess(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
 export function useUpdateDescription() {
   return useMutation({
     mutationFn: ({ id, type, description }: { id: string; type: "document" | "folder"; description: string | null }) =>

@@ -1,5 +1,5 @@
 from .base import Base
-from .item import DocumentChunk, DocumentSummary, Item
+from .document import DocumentChunk, DocumentSummary, Item
 from .processing_job import ProcessingJob
 from .user import User
 

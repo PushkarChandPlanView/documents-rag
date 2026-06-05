@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dependencies import get_current_user, get_db
 from models.user import User
-from schemas.document import FolderItem, ItemUpdateRequest
+from schemas.document import Item, ItemUpdateRequest
 from schemas.folder import FolderCreate, FolderListResponse
-from services import item_service
+from services import document_service as item_service
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +18,10 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 
 
 class BreadcrumbResponse(BaseModel):
-    items: list[FolderItem]
+    items: list[Item]
 
 
-def _item_to_folder_response(item) -> FolderItem:
-    return FolderItem(
-        id=item.id,
-        name=item.name,
-        parent_id=item.parent_id,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-    )
-
-
-@router.post("", response_model=FolderItem, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Item, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     body: FolderCreate,
     db: AsyncSession = Depends(get_db),
@@ -47,7 +37,7 @@ async def create_folder(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     logger.info("Folder created: folder_id=%s user_id=%s", folder.id, current_user.id)
-    return _item_to_folder_response(folder)
+    return item_service._to_item(folder)
 
 
 @router.get("", response_model=FolderListResponse)
@@ -57,7 +47,7 @@ async def list_folders(
     current_user: User = Depends(get_current_user),
 ):
     folders = await item_service.list_folders(db, current_user.id, parent_id=parent_id)
-    items = [_item_to_folder_response(f) for f in folders]
+    items = [item_service._to_item(f) for f in folders]
     return FolderListResponse(items=items, total=len(items))
 
 
@@ -73,7 +63,7 @@ async def get_folder_breadcrumb(
     return BreadcrumbResponse(items=crumbs)
 
 
-@router.get("/{folder_id}", response_model=FolderItem)
+@router.get("/{folder_id}", response_model=Item)
 async def get_folder(
     folder_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -82,10 +72,10 @@ async def get_folder(
     folder = await item_service.get_item(db, folder_id, current_user.id)
     if not folder or folder.type != "folder":
         raise HTTPException(status_code=404, detail="Folder not found")
-    return _item_to_folder_response(folder)
+    return item_service._to_item(folder)
 
 
-@router.patch("/{folder_id}", response_model=FolderItem)
+@router.patch("/{folder_id}", response_model=Item)
 async def update_folder(
     folder_id: UUID,
     body: ItemUpdateRequest,
@@ -104,7 +94,7 @@ async def update_folder(
     )
     if not item or item.type != "folder":
         raise HTTPException(status_code=404, detail="Folder not found")
-    return _item_to_folder_response(item)
+    return item_service._to_item(item)
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)

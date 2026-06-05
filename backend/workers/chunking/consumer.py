@@ -67,7 +67,7 @@ class ChunkingConsumer(BaseConsumer):
                 )
                 await session.execute(
                     sql_text(
-                        "UPDATE items SET status = 'FAILED', updated_at = now() WHERE id = :doc_id"
+                        "UPDATE documents SET status = 'FAILED', updated_at = now() WHERE id = :doc_id"
                     ).bindparams(doc_id=event.document_id)
                 )
                 await session.commit()

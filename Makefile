@@ -6,7 +6,7 @@ ENV_FILE = .env
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start all services
+up: ## Start all services (migrations run automatically on api_gateway startup)
 	@cp -n $(ENV_FILE).example $(ENV_FILE) 2>/dev/null || true
 	$(COMPOSE) up -d
 	@echo "✓ Services started. API: http://localhost/api  UI: http://localhost  MinIO: http://localhost:9091"
@@ -23,7 +23,7 @@ restart: ## Restart a specific service: make restart svc=api_gateway
 logs: ## Tail logs for all services (or specific: make logs svc=api_gateway)
 	$(COMPOSE) logs -f $(svc)
 
-migrate: ## Run Alembic database migrations
+migrate: ## Run Alembic migrations manually (normally runs automatically on startup)
 	$(COMPOSE) exec api_gateway alembic upgrade head
 
 topics: ## Create Kafka topics (runs kafka-init container)
@@ -58,6 +58,3 @@ test: ## Run integration tests
 	$(COMPOSE) run --rm -e PYTHONPATH=/app api_gateway pytest /app/tests/ -v
 
 
-
-email: admin@example.com
-password: changeme

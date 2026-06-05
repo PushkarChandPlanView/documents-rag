@@ -1,5 +1,6 @@
+import json
 import logging
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -26,15 +27,36 @@ class SearchRequest(BaseModel):
     top_k: int = 5
 
 
+async def _safe_stream(request: QueryRequest) -> AsyncGenerator[str, None]:
+    """Wrap rag_chain.run() so any mid-stream exception is sent as a final SSE
+    error event rather than dropping the connection (which causes an
+    'incomplete chunked read' on the api_gateway side)."""
+    try:
+        async for chunk in rag_chain.run(
+            query=request.query,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+        ):
+            yield chunk
+    except Exception as exc:
+        logger.error("RAG chain error during streaming: %s", exc, exc_info=True)
+        yield (
+            "data: "
+            + json.dumps({
+                "type": "error",
+                "token": "Sorry, an error occurred while generating the answer.",
+                "sources": [],
+                "done": True,
+            })
+            + "\n\n"
+        )
+
+
 @router.post("/query")
 async def query(request: QueryRequest):
     """Stream RAG answer as SSE."""
     return StreamingResponse(
-        rag_chain.run(
-            query=request.query,
-            user_id=request.user_id,
-            document_ids=request.document_ids,
-        ),
+        _safe_stream(request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -47,7 +69,7 @@ async def query(request: QueryRequest):
 async def search(request: SearchRequest):
     """Semantic search without LLM generation."""
     query_embedding = await llm_client.embed(request.query)
-    chunks = retriever.retrieve(
+    chunks = await retriever.retrieve(
         query_embedding=query_embedding,
         user_id=request.user_id,
         document_ids=request.document_ids,

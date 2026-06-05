@@ -24,7 +24,8 @@ async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
             "num_predict": settings.ollama_num_predict,
         },
     }
-    async with httpx.AsyncClient(timeout=300) as client:
+    client = httpx.AsyncClient(timeout=300)
+    try:
         async with client.stream("POST", f"{settings.ollama_base_url}/api/generate", json=payload) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
@@ -38,6 +39,8 @@ async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
                             break
                     except json.JSONDecodeError:
                         continue
+    finally:
+        await client.aclose()
 
 
 async def embed(text: str) -> list[float]:

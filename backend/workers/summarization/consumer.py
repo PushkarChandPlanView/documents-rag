@@ -104,7 +104,7 @@ class SummarizationConsumer(BaseConsumer):
             )
             await session.execute(
                 sql_text(
-                    "UPDATE items SET status = 'COMPLETED', updated_at = now() WHERE id = :doc_id"
+                    "UPDATE documents SET status = 'COMPLETED', updated_at = now() WHERE id = :doc_id"
                 ).bindparams(doc_id=event.document_id)
             )
             await session.execute(

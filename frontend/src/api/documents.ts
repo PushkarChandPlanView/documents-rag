@@ -55,6 +55,10 @@ export const documentsApi = {
     await apiClient.delete(`/folders/${id}`);
   },
 
+  reprocess: async (id: string): Promise<void> => {
+    await apiClient.post(`/documents/${id}/reprocess`);
+  },
+
   updateDocument: async (id: string, data: { name?: string; description?: string | null; parent_id?: string | null }): Promise<void> => {
     await apiClient.patch(`/documents/${id}`, data);
   },

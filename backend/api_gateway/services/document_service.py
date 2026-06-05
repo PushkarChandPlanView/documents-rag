@@ -1,105 +1,207 @@
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models.document import Document, DocumentChunk
-from models.folder import Folder  # noqa: F401
+from models.document import DocumentChunk, DocumentSummary, Item as ItemModel
 from models.processing_job import ProcessingJob
-from schemas.document import DocumentItem, FolderItem, UnifiedListResponse, decode_cursor, encode_cursor
+from schemas.document import (
+    DocumentDetailResponse,
+    Item,
+    ProcessingJobResponse,
+    UnifiedListResponse,
+    decode_cursor,
+    encode_cursor,
+)
 
 
-async def create_document(
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _to_item(item: ItemModel) -> Item:
+    return Item(
+        type=item.type,
+        id=item.id,
+        name=item.name,
+        description=item.description,
+        parent_id=item.parent_id,
+        parent_name=item.parent.name if item.parent else None,
+        mime_type=item.mime_type,
+        file_size_bytes=item.file_size_bytes,
+        status=item.status,
+        source_url=item.source_url,
+        processing_jobs=[ProcessingJobResponse.model_validate(j) for j in item.processing_jobs],
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+# backward compat
+_to_folder_item = _to_item
+_to_document_item = _to_item
+
+
+async def _load_item(db: AsyncSession, item_id: UUID) -> Optional[ItemModel]:
+    """Fetch a single item with parent + processing_jobs eagerly loaded."""
+    result = await db.execute(
+        select(ItemModel)
+        .where(ItemModel.id == item_id)
+        .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
+    )
+    return result.scalar_one_or_none()
+
+
+# ── Document items ────────────────────────────────────────────────────────────
+
+async def create_document_item(
     db: AsyncSession,
     user_id: UUID,
     filename: str,
     minio_key: str,
     mime_type: str,
     file_size_bytes: int,
-    folder_id: Optional[UUID] = None,
-) -> Document:
-    doc = Document(
+    parent_id: Optional[UUID] = None,
+) -> Item:
+    item = ItemModel(
+        type="document",
         user_id=user_id,
-        filename=filename,
+        name=filename,
         minio_key=minio_key,
         mime_type=mime_type,
         file_size_bytes=file_size_bytes,
-        folder_id=folder_id,
+        parent_id=parent_id,
         status="PENDING",
     )
-    db.add(doc)
+    db.add(item)
     await db.flush()
 
-    # Pre-create processing jobs for each pipeline stage
-    stages = ["TEXT_EXTRACTION", "CHUNKING", "EMBEDDING", "SUMMARIZATION"]
-    for stage in stages:
-        job = ProcessingJob(document_id=doc.id, stage=stage, status="PENDING")
-        db.add(job)
+    for stage in ["TEXT_EXTRACTION", "CHUNKING", "EMBEDDING", "SUMMARIZATION"]:
+        db.add(ProcessingJob(document_id=item.id, stage=stage, status="PENDING"))
 
     await db.commit()
-    await db.refresh(doc)
-    return doc
+    return await _load_item(db, item.id)
 
 
-async def create_link_document(
+async def create_link_item(
     db: AsyncSession,
     user_id: UUID,
     url: str,
     title: Optional[str],
-    folder_id: Optional[UUID] = None,
-) -> Document:
-    filename = title or url
-    doc = Document(
+    parent_id: Optional[UUID] = None,
+) -> Item:
+    item = ItemModel(
+        type="document",
         user_id=user_id,
-        filename=filename[:500],
+        name=(title or url)[:500],
         minio_key="",
         mime_type="text/html",
         file_size_bytes=0,
-        folder_id=folder_id,
+        parent_id=parent_id,
         source_url=url,
         status="PENDING",
     )
-    db.add(doc)
+    db.add(item)
     await db.flush()
 
-    stages = ["TEXT_EXTRACTION", "CHUNKING", "EMBEDDING", "SUMMARIZATION"]
-    for stage in stages:
-        job = ProcessingJob(document_id=doc.id, stage=stage, status="PENDING")
-        db.add(job)
+    for stage in ["TEXT_EXTRACTION", "CHUNKING", "EMBEDDING", "SUMMARIZATION"]:
+        db.add(ProcessingJob(document_id=item.id, stage=stage, status="PENDING"))
 
     await db.commit()
-    await db.refresh(doc)
-    return doc
+    return await _load_item(db, item.id)
 
 
-async def get_document(db: AsyncSession, document_id: UUID, user_id: UUID) -> Optional[Document]:
+# ── Folder items ──────────────────────────────────────────────────────────────
+
+async def create_folder_item(
+    db: AsyncSession,
+    user_id: UUID,
+    name: str,
+    parent_id: Optional[UUID] = None,
+) -> Item:
+    if parent_id:
+        parent = await get_item(db, parent_id, user_id)
+        if not parent or parent.type != "folder":
+            raise ValueError("Parent folder not found")
+
+    item = ItemModel(type="folder", user_id=user_id, name=name, parent_id=parent_id)
+    db.add(item)
+    await db.commit()
+    return await _load_item(db, item.id)
+
+
+# ── Shared retrieval ──────────────────────────────────────────────────────────
+
+async def get_item(db: AsyncSession, item_id: UUID, user_id: UUID) -> Optional[Item]:
     result = await db.execute(
-        select(Document)
-        .where(Document.id == document_id, Document.user_id == user_id)
-        .options(selectinload(Document.processing_jobs), selectinload(Document.folder))
+        select(ItemModel).where(ItemModel.id == item_id, ItemModel.user_id == user_id)
     )
     return result.scalar_one_or_none()
 
 
-async def list_documents(
-    db: AsyncSession,
-    user_id: UUID,
-    offset: int = 0,
-    limit: int = 50,
-) -> list[Document]:
+async def get_document_detail(
+    db: AsyncSession, item_id: UUID, user_id: UUID
+) -> Optional[DocumentDetailResponse]:
     result = await db.execute(
-        select(Document)
-        .where(Document.user_id == user_id)
-        .order_by(Document.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .options(selectinload(Document.processing_jobs), selectinload(Document.folder))
+        select(ItemModel)
+        .where(ItemModel.id == item_id, ItemModel.user_id == user_id, ItemModel.type == "document")
+        .options(selectinload(ItemModel.processing_jobs), selectinload(ItemModel.parent))
     )
-    return list(result.scalars().all())
+    item = result.scalar_one_or_none()
+    if not item:
+        return None
+
+    summary_result = await db.execute(
+        select(DocumentSummary)
+        .where(DocumentSummary.document_id == item_id, DocumentSummary.is_active.is_(True))
+        .order_by(DocumentSummary.created_at.desc())
+        .limit(1)
+    )
+    summary_row = summary_result.scalar_one_or_none()
+
+    return DocumentDetailResponse(
+        id=item.id,
+        filename=item.name,
+        mime_type=item.mime_type or "",
+        file_size_bytes=item.file_size_bytes or 0,
+        status=item.status or "PENDING",
+        folder_id=item.parent_id,
+        folder_name=item.parent.name if item.parent else None,
+        source_url=item.source_url,
+        summary=summary_row.summary if summary_row else None,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        processing_jobs=[
+            ProcessingJobResponse.model_validate(j) for j in item.processing_jobs
+        ],
+    )
+
+
+async def get_breadcrumb(
+    db: AsyncSession, folder_id: UUID, user_id: UUID
+) -> list[Item]:
+    """Return path from root to folder_id (root first, target last)."""
+    path: list[Item] = []
+    current_id: Optional[UUID] = folder_id
+    visited: set[UUID] = set()
+    while current_id and current_id not in visited:
+        visited.add(current_id)
+        result = await db.execute(
+            select(ItemModel)
+            .where(
+                ItemModel.id == current_id,
+                ItemModel.user_id == user_id,
+                ItemModel.type == "folder",
+            )
+            .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
+        )
+        item = result.scalar_one_or_none()
+        if not item:
+            break
+        path.append(_to_folder_item(item))
+        current_id = item.parent_id
+    return list(reversed(path))
 
 
 async def list_unified(
@@ -107,98 +209,152 @@ async def list_unified(
     user_id: UUID,
     limit: int = 50,
     cursor: Optional[str] = None,
+    parent_id: Optional[UUID] = None,
 ) -> UnifiedListResponse:
-    """Return folders and documents merged into one cursor-paginated list, sorted by created_at DESC."""
-    cursor_ts: Optional[datetime] = None
-    cursor_id: Optional[UUID] = None
+    if parent_id is not None:
+        base = (
+            select(ItemModel.id)
+            .where(ItemModel.parent_id == parent_id, ItemModel.user_id == user_id)
+        )
+        cte = base.cte(recursive=True)
+        rec = (
+            select(ItemModel.id)
+            .join(cte, ItemModel.parent_id == cte.c.id)
+            .where(ItemModel.user_id == user_id)
+        )
+        cte = cte.union_all(rec)
+
+        stmt = (
+            select(ItemModel)
+            .where(ItemModel.id.in_(select(cte.c.id)))
+            .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
+            .order_by(ItemModel.created_at.desc(), ItemModel.id.desc())
+        )
+        rows = list((await db.execute(stmt)).scalars().all())
+        unified = [
+            _to_item(item)
+            for item in rows
+        ]
+        return UnifiedListResponse(items=unified, next_cursor=None, has_more=False)
+
+    stmt = (
+        select(ItemModel)
+        .where(ItemModel.user_id == user_id)
+        .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
+        .order_by(ItemModel.created_at.desc(), ItemModel.id.desc())
+    )
     if cursor:
         cursor_ts, cursor_id = decode_cursor(cursor)
-
-    # Fetch all folders for user (typically small; no separate pagination needed)
-    folder_stmt = (
-        select(Folder)
-        .where(Folder.user_id == user_id)
-        .order_by(Folder.created_at.desc(), Folder.id.desc())
-    )
-    folder_result = await db.execute(folder_stmt)
-    folders = list(folder_result.scalars().all())
-
-    # Fetch documents with eager-loaded jobs + folder
-    doc_stmt = (
-        select(Document)
-        .where(Document.user_id == user_id)
-        .order_by(Document.created_at.desc(), Document.id.desc())
-        .options(selectinload(Document.processing_jobs), selectinload(Document.folder))
-    )
-    doc_result = await db.execute(doc_stmt)
-    documents = list(doc_result.scalars().all())
-
-    # Convert to unified items
-    folder_items: list[FolderItem | DocumentItem] = [
-        FolderItem(
-            id=f.id,
-            name=f.name,
-            parent_id=f.parent_id,
-            created_at=f.created_at,
-            updated_at=f.updated_at,
+        stmt = stmt.where(
+            or_(
+                ItemModel.created_at < cursor_ts,
+                and_(Item.created_at == cursor_ts, ItemModel.id < cursor_id),
+            )
         )
-        for f in folders
+    stmt = stmt.limit(limit + 1)
+    rows = list((await db.execute(stmt)).scalars().all())
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
+    unified = [
+        _to_item(item)
+        for item in page
     ]
-    doc_items: list[FolderItem | DocumentItem] = [
-        DocumentItem(
-            id=d.id,
-            filename=d.filename,
-            mime_type=d.mime_type,
-            file_size_bytes=d.file_size_bytes,
-            status=d.status,
-            folder_id=d.folder_id,
-            folder_name=d.folder.name if d.folder else None,
-            source_url=d.source_url,
-            summary=d.summary,
-            created_at=d.created_at,
-            updated_at=d.updated_at,
-            processing_jobs=d.processing_jobs,
-        )
-        for d in documents
-    ]
-
-    # Merge and sort by (created_at DESC, id DESC)
-    all_items = sorted(
-        folder_items + doc_items,
-        key=lambda x: (x.created_at, x.id),
-        reverse=True,
-    )
-
-    # Apply cursor filter
-    if cursor_ts and cursor_id:
-        all_items = [
-            item for item in all_items
-            if (item.created_at, item.id) < (cursor_ts, cursor_id)
-        ]
-
-    # Paginate with limit+1 trick to detect has_more
-    page = all_items[: limit + 1]
-    has_more = len(page) > limit
-    page = page[:limit]
-
-    next_cursor: Optional[str] = None
-    if has_more and page:
-        last = page[-1]
-        next_cursor = encode_cursor(last.created_at, last.id)
-
-    return UnifiedListResponse(items=page, next_cursor=next_cursor, has_more=has_more)
+    return UnifiedListResponse(items=unified, next_cursor=next_cursor, has_more=has_more)
 
 
-async def delete_document(db: AsyncSession, document_id: UUID, user_id: UUID) -> bool:
+async def update_item(
+    db: AsyncSession,
+    item_id: UUID,
+    user_id: UUID,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    clear_description: bool = False,
+    parent_id: Optional[UUID] = None,
+    clear_parent: bool = False,
+) -> Optional[Item]:
     result = await db.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user_id)
+        select(ItemModel).where(ItemModel.id == item_id, ItemModel.user_id == user_id)
     )
-    doc = result.scalar_one_or_none()
-    if not doc:
-        return False
-    await db.delete(doc)
+    item = result.scalar_one_or_none()
+    if not item:
+        return None
+    if name is not None:
+        item.name = name
+    if clear_description:
+        item.description = None
+    elif description is not None:
+        item.description = description
+    if clear_parent:
+        item.parent_id = None
+    elif parent_id is not None:
+        item.parent_id = parent_id
+    item.updated_at = datetime.utcnow()
     await db.commit()
-    return True
+    return await _load_item(db, item.id)
+
+
+async def reprocess_document(
+    db: AsyncSession,
+    document_id: UUID,
+    user_id: UUID,
+) -> Optional[ItemModel]:
+    """Reset processing state and return the item so the router can re-publish the Kafka event."""
+    result = await db.execute(
+        select(ItemModel)
+        .where(ItemModel.id == document_id, ItemModel.user_id == user_id, ItemModel.type == "document")
+        .options(selectinload(ItemModel.processing_jobs))
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        return None
+
+    # Clear partial results — delete embeddings first (FK cascade would handle
+    # it via document_chunks, but we delete explicitly for clarity and safety)
+    from sqlalchemy import delete as sql_delete, text as sql_text
+    await db.execute(sql_text(
+        "DELETE FROM document_embeddings WHERE document_id = :doc_id"
+    ).bindparams(doc_id=document_id))
+    await db.execute(sql_delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
+    await db.execute(sql_delete(DocumentSummary).where(DocumentSummary.document_id == document_id))
+
+    # Reset all processing jobs
+    for job in item.processing_jobs:
+        job.status = "PENDING"
+        job.error_message = None
+        job.started_at = None
+        job.completed_at = None
+
+    item.status = "PROCESSING"
+    item.updated_at = datetime.utcnow()
+    await db.commit()
+    return item
+
+
+async def delete_item(db: AsyncSession, item_id: UUID, user_id: UUID) -> Optional[Item]:
+    result = await db.execute(
+        select(ItemModel).where(ItemModel.id == item_id, ItemModel.user_id == user_id)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        return None
+    await db.delete(item)
+    await db.commit()
+    return item
+
+
+async def list_folders(
+    db: AsyncSession,
+    user_id: UUID,
+    parent_id: Optional[UUID] = None,
+) -> list[Item]:
+    stmt = select(ItemModel).where(ItemModel.user_id == user_id, ItemModel.type == "folder")
+    if parent_id is None:
+        stmt = stmt.where(ItemModel.parent_id.is_(None))
+    else:
+        stmt = stmt.where(ItemModel.parent_id == parent_id)
+    stmt = stmt.order_by(ItemModel.name)
+    return list((await db.execute(stmt)).scalars().all())
 
 
 async def get_processing_jobs(db: AsyncSession, document_id: UUID) -> list[ProcessingJob]:

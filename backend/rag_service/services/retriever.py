@@ -1,5 +1,9 @@
 """
-ChromaDB retriever with hybrid scoring (semantic + keyword) and neighbor expansion.
+pgvector retriever with hybrid scoring (semantic + keyword) and neighbor expansion.
+
+Replaces the ChromaDB retriever. All vector data now lives in the
+`document_embeddings` table in PostgreSQL; chunk text is JOINed from
+`document_chunks`.
 
 Scoring:
   final_score = (semantic_weight * cosine_similarity) + (keyword_weight * keyword_overlap)
@@ -16,15 +20,13 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-import chromadb
-from chromadb.config import Settings
+from sqlalchemy import text as sql_text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from config import get_settings
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
-
-_client = None
 
 # Hybrid scoring weights (must sum to 1.0)
 SEMANTIC_WEIGHT = 0.7
@@ -39,19 +41,26 @@ _STOPWORDS = {
     "their", "its", "you", "we", "they", "i", "my", "me",
 }
 
+_engine = None
+_session_factory = None
 
-def get_collection():
-    global _client
-    if _client is None:
-        _client = chromadb.HttpClient(
-            host=settings.chroma_host,
-            port=settings.chroma_port,
-            settings=Settings(anonymized_telemetry=False),
+
+def _get_session_factory() -> async_sessionmaker:
+    global _engine, _session_factory
+    if _session_factory is None:
+        _engine = create_async_engine(
+            settings.postgres_url,
+            echo=False,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
         )
-    return _client.get_or_create_collection(
-        name=settings.chroma_collection,
-        metadata={"hnsw:space": "cosine"},
-    )
+        _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+    return _session_factory
+
+
+def _new_session() -> AsyncSession:
+    return _get_session_factory()()
 
 
 @dataclass
@@ -80,176 +89,233 @@ def _keyword_score(query_terms: set[str], chunk_text: str) -> float:
     return matched / len(query_terms)
 
 
-def _build_where_filter(user_id: str, document_ids: Optional[list[str]]) -> dict:
+def _embedding_literal(embedding: list[float]) -> str:
+    return "[" + ",".join(str(x) for x in embedding) + "]"
+
+
+async def _semantic_search(
+    session: AsyncSession,
+    embedding: list[float],
+    user_id: str,
+    document_ids: Optional[list[str]],
+    top_k: int,
+) -> list[dict]:
+    """Run a cosine similarity search using pgvector's <=> operator."""
+    emb_literal = _embedding_literal(embedding)
+
     if document_ids and len(document_ids) == 1:
-        return {
-            "$and": [
-                {"user_id": {"$eq": user_id}},
-                {"document_id": {"$eq": document_ids[0]}},
-            ]
-        }
+        where_clause = "de.user_id = CAST(:user_id AS uuid) AND de.document_id = CAST(:doc_id AS uuid)"
+        params: dict = {"user_id": user_id, "doc_id": document_ids[0],
+                        "embedding": emb_literal, "top_k": top_k}
     elif document_ids:
-        return {
-            "$and": [
-                {"user_id": {"$eq": user_id}},
-                {"document_id": {"$in": document_ids}},
-            ]
-        }
-    return {"user_id": {"$eq": user_id}}
+        where_clause = "de.user_id = CAST(:user_id AS uuid) AND de.document_id = ANY(CAST(:doc_ids AS uuid[]))"
+        params = {"user_id": user_id, "doc_ids": document_ids,
+                  "embedding": emb_literal, "top_k": top_k}
+    else:
+        where_clause = "de.user_id = CAST(:user_id AS uuid)"
+        params = {"user_id": user_id, "embedding": emb_literal, "top_k": top_k}
+
+    result = await session.execute(
+        sql_text(f"""
+            SELECT
+                de.chunk_id::text,
+                de.document_id::text,
+                de.user_id::text,
+                de.chunk_index,
+                de.page_number,
+                de.document_name,
+                de.file_type,
+                dc.text,
+                (de.embedding <=> CAST(:embedding AS vector)) AS distance
+            FROM document_embeddings de
+            JOIN document_chunks dc ON dc.id = de.chunk_id
+            WHERE {where_clause}
+            ORDER BY distance ASC
+            LIMIT :top_k
+        """),
+        params,
+    )
+    return [dict(r._mapping) for r in result.fetchall()]
 
 
-def _fetch_neighbors(
-    collection,
+async def _fetch_neighbors(
+    session: AsyncSession,
     document_id: str,
     user_id: str,
     chunk_indices: list[int],
 ) -> list[RetrievedChunk]:
     if not chunk_indices:
         return []
-    where: dict = {
-        "$and": [
-            {"user_id": {"$eq": user_id}},
-            {"document_id": {"$eq": document_id}},
-            {"chunk_index": {"$in": chunk_indices}},
-        ]
-    }
-    try:
-        results = collection.get(where=where, include=["documents", "metadatas"])
-    except Exception:
-        return []
-
+    result = await session.execute(
+        sql_text("""
+            SELECT
+                de.chunk_id::text,
+                de.document_id::text,
+                de.user_id::text,
+                de.chunk_index,
+                de.page_number,
+                de.document_name,
+                de.file_type,
+                dc.text
+            FROM document_embeddings de
+            JOIN document_chunks dc ON dc.id = de.chunk_id
+            WHERE de.user_id = CAST(:user_id AS uuid)
+              AND de.document_id = CAST(:doc_id AS uuid)
+              AND de.chunk_index = ANY(:indices)
+        """),
+        {"user_id": user_id, "doc_id": document_id, "indices": chunk_indices},
+    )
     neighbors = []
-    for i, chunk_id in enumerate(results["ids"]):
-        meta = results["metadatas"][i]
+    for row in result.fetchall():
+        r = dict(row._mapping)
         neighbors.append(RetrievedChunk(
-            chunk_id=chunk_id,
-            document_id=meta.get("document_id", ""),
-            text=results["documents"][i],
+            chunk_id=r["chunk_id"],
+            document_id=r["document_id"],
+            text=r["text"],
             score=0.0,
-            chunk_index=meta.get("chunk_index", 0),
-            page_number=meta.get("page_number") if meta.get("page_number", -1) != -1 else None,
-            user_id=meta.get("user_id", ""),
-            document_name=meta.get("document_name", ""),
-            file_type=meta.get("file_type", ""),
+            chunk_index=r["chunk_index"],
+            page_number=r["page_number"],
+            user_id=r["user_id"],
+            document_name=r.get("document_name", ""),
+            file_type=r.get("file_type", ""),
         ))
     return neighbors
 
 
-def _keyword_query(
-    collection,
-    query_embedding: list[float],
-    where_filter: dict,
-    where_document: dict,
-    top_k: int,
-) -> dict:
-    """Query with both metadata filter and document keyword filter."""
-    try:
-        return collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(top_k, collection.count() or 1),
-            where=where_filter,
-            where_document=where_document,
-            include=["documents", "metadatas", "distances"],
-        )
-    except Exception:
-        return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
-
-
-def _parse_results(results: dict, terms: set[str]) -> list[RetrievedChunk]:
+def _rows_to_chunks(rows: list[dict], terms: set[str]) -> list[RetrievedChunk]:
     chunks = []
-    if not results["ids"] or not results["ids"][0]:
-        return chunks
-    for i, chunk_id in enumerate(results["ids"][0]):
-        meta = results["metadatas"][0][i]
-        semantic_score = 1.0 - results["distances"][0][i]
-        kw_score = _keyword_score(terms, results["documents"][0][i])
+    for row in rows:
+        semantic_score = 1.0 - row["distance"]
+        kw_score = _keyword_score(terms, row["text"])
         hybrid_score = (SEMANTIC_WEIGHT * semantic_score) + (KEYWORD_WEIGHT * kw_score)
         chunks.append(RetrievedChunk(
-            chunk_id=chunk_id,
-            document_id=meta.get("document_id", ""),
-            text=results["documents"][0][i],
+            chunk_id=row["chunk_id"],
+            document_id=row["document_id"],
+            text=row["text"],
             score=hybrid_score,
-            chunk_index=meta.get("chunk_index", 0),
-            page_number=meta.get("page_number") if meta.get("page_number", -1) != -1 else None,
-            user_id=meta.get("user_id", ""),
-            document_name=meta.get("document_name", ""),
-            file_type=meta.get("file_type", ""),
+            chunk_index=row["chunk_index"],
+            page_number=row["page_number"],
+            user_id=row["user_id"],
+            document_name=row.get("document_name", ""),
+            file_type=row.get("file_type", ""),
         ))
     return chunks
 
 
-def retrieve(
+async def retrieve(
     query_embedding: list[float],
     user_id: str,
     document_ids: Optional[list[str]] = None,
     top_k: int = 20,
     query: str = "",
 ) -> list[RetrievedChunk]:
-    collection = get_collection()
-    where_filter = _build_where_filter(user_id, document_ids)
+    """
+    Main entry point — async, returns hybrid-scored and neighbor-expanded chunks.
+    """
     terms = _query_terms(query)
+    significant = [t for t in terms if len(t) > 4]
 
-    # Stage 1 — keyword-first: filter to chunks that contain the most
-    # significant query terms, then rank by semantic similarity within
-    # that filtered set. This prevents unrelated sections from winning
-    # purely on semantic score.
-    chunks: list[RetrievedChunk] = []
-    significant = [t for t in terms if len(t) > 4]  # skip short/generic terms
+    async with _new_session() as session:
+        # Stage 1 — keyword-first: semantic search filtered to chunks containing
+        # the most significant query terms (ILIKE; add GIN trgm index for scale).
+        chunks: list[RetrievedChunk] = []
+        for term in significant:
+            emb_literal = _embedding_literal(query_embedding)
 
-    for term in significant:
-        results = _keyword_query(
-            collection,
-            query_embedding,
-            where_filter,
-            {"$contains": term},
-            top_k,
+            if document_ids and len(document_ids) == 1:
+                where_clause = (
+                    "de.user_id = CAST(:user_id AS uuid) "
+                    "AND de.document_id = CAST(:doc_id AS uuid) "
+                    "AND dc.text ILIKE :term"
+                )
+                params: dict = {
+                    "user_id": user_id, "doc_id": document_ids[0],
+                    "embedding": emb_literal, "top_k": top_k, "term": f"%{term}%",
+                }
+            elif document_ids:
+                where_clause = (
+                    "de.user_id = CAST(:user_id AS uuid) "
+                    "AND de.document_id = ANY(CAST(:doc_ids AS uuid[])) "
+                    "AND dc.text ILIKE :term"
+                )
+                params = {
+                    "user_id": user_id, "doc_ids": document_ids,
+                    "embedding": emb_literal, "top_k": top_k, "term": f"%{term}%",
+                }
+            else:
+                where_clause = (
+                    "de.user_id = CAST(:user_id AS uuid) "
+                    "AND dc.text ILIKE :term"
+                )
+                params = {
+                    "user_id": user_id, "embedding": emb_literal,
+                    "top_k": top_k, "term": f"%{term}%",
+                }
+
+            result = await session.execute(
+                sql_text(f"""
+                    SELECT
+                        de.chunk_id::text,
+                        de.document_id::text,
+                        de.user_id::text,
+                        de.chunk_index,
+                        de.page_number,
+                        de.document_name,
+                        de.file_type,
+                        dc.text,
+                        (de.embedding <=> CAST(:embedding AS vector)) AS distance
+                    FROM document_embeddings de
+                    JOIN document_chunks dc ON dc.id = de.chunk_id
+                    WHERE {where_clause}
+                    ORDER BY distance ASC
+                    LIMIT :top_k
+                """),
+                params,
+            )
+            rows = [dict(r._mapping) for r in result.fetchall()]
+            if rows:
+                chunks = _rows_to_chunks(rows, terms)
+                logger.info(
+                    "Keyword-first stage matched %d chunks on term=%r",
+                    len(chunks), term,
+                )
+                break
+
+        # Stage 2 — fallback to pure semantic search
+        if not chunks:
+            logger.info("Keyword-first found nothing, falling back to semantic search")
+            rows = await _semantic_search(session, query_embedding, user_id, document_ids, top_k)
+            chunks = _rows_to_chunks(rows, terms)
+
+        chunks.sort(key=lambda c: c.score, reverse=True)
+
+        logger.info(
+            "Final scores for query=%r top5=%s",
+            query,
+            [(round(c.score, 3), c.chunk_index) for c in chunks[:5]],
         )
-        matched = _parse_results(results, terms)
-        if matched:
-            chunks = matched
-            logger.info("Keyword-first stage matched %d chunks on term=%r", len(chunks), term)
-            break
 
-    # Stage 2 — fallback to pure semantic if keyword stage found nothing
-    if not chunks:
-        logger.info("Keyword-first found nothing, falling back to semantic search")
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(top_k, collection.count() or 1),
-            where=where_filter,
-            include=["documents", "metadatas", "distances"],
-        )
-        chunks = _parse_results(results, terms)
+        # Neighbor expansion
+        seen_ids = {c.chunk_id for c in chunks}
+        by_doc: dict[str, list[RetrievedChunk]] = {}
+        for c in chunks:
+            by_doc.setdefault(c.document_id, []).append(c)
 
-    chunks.sort(key=lambda c: c.score, reverse=True)
+        neighbors: list[RetrievedChunk] = []
+        for doc_id, doc_chunks in by_doc.items():
+            existing_indices = {c.chunk_index for c in doc_chunks}
+            neighbor_indices: set[int] = set()
+            for c in doc_chunks:
+                if c.chunk_index > 0:
+                    neighbor_indices.add(c.chunk_index - 1)
+                neighbor_indices.add(c.chunk_index + 1)
+            neighbor_indices -= existing_indices
 
-    logger.info(
-        "Final scores for query=%r top5=%s",
-        query,
-        [(round(c.score, 3), c.chunk_index) for c in chunks[:5]],
-    )
+            for n in await _fetch_neighbors(session, doc_id, user_id, list(neighbor_indices)):
+                if n.chunk_id not in seen_ids:
+                    neighbors.append(n)
+                    seen_ids.add(n.chunk_id)
 
-    # Neighbor expansion
-    seen_ids = {c.chunk_id for c in chunks}
-    by_doc: dict[str, list[RetrievedChunk]] = {}
-    for c in chunks:
-        by_doc.setdefault(c.document_id, []).append(c)
-
-    neighbors: list[RetrievedChunk] = []
-    for doc_id, doc_chunks in by_doc.items():
-        neighbor_indices: set[int] = set()
-        existing_indices = {c.chunk_index for c in doc_chunks}
-        for c in doc_chunks:
-            if c.chunk_index > 0:
-                neighbor_indices.add(c.chunk_index - 1)
-            neighbor_indices.add(c.chunk_index + 1)
-        neighbor_indices -= existing_indices
-
-        for n in _fetch_neighbors(collection, doc_id, user_id, list(neighbor_indices)):
-            if n.chunk_id not in seen_ids:
-                neighbors.append(n)
-                seen_ids.add(n.chunk_id)
-
-    logger.info("Expanded with %d neighbor chunks", len(neighbors))
+        logger.info("Expanded with %d neighbor chunks", len(neighbors))
 
     return chunks + sorted(neighbors, key=lambda c: c.chunk_index)

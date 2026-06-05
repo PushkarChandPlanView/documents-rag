@@ -7,10 +7,6 @@ class RAGSettings(BaseSettings):
 
     postgres_url: str = "postgresql+asyncpg://docstore:changeme@postgres:5432/docstore"
 
-    chroma_host: str = "chroma"
-    chroma_port: int = 8000
-    chroma_collection: str = "document_chunks"
-
     ollama_base_url: str = "http://ollama:11434"
     ollama_llm_model: str = "llama3"
     ollama_embed_model: str = "nomic-embed-text"

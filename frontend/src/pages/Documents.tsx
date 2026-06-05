@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import { ContentLayout } from "@planview/pv-uikit";
 import Layout from "@/components/layout/Layout";
 import { ItemList } from "@/components/documents/ItemList";
-import { ItemDetailsPane } from "@/components/documents/ItemDetailsPane";
+import { DetailsPane } from "@/components/documents/detailspane";
 import { ItemFilters } from "@/components/documents/ItemFilters";
 import { ItemToolbar } from "@/components/documents/ItemToolbar";
 import { FileUploadDialog } from "@/components/documents/FileUploadDialog";
 import { CreateFolderDialog } from "@/components/documents/CreateFolderDialog";
 import { AddLinkDialog } from "@/components/documents/AddLinkDialog";
 import type { ItemFiltersState } from "@/components/documents/ItemFilters";
-import type { DetailTab } from "@/components/documents/ItemDetailsPane";
+import type { DetailTab } from "@/components/documents/detailspane";
 import type { DocumentItem, UnifiedItem } from "@/types";
+import { useFolderBreadcrumb } from "@/hooks/useFolders";
 
 const PageWrapper = styled.div`
   display: flex;
@@ -40,6 +41,9 @@ type Selection = { item: UnifiedItem; tab: DetailTab } | null;
 
 export default function Documents() {
   const navigate = useNavigate();
+  const { folderId } = useParams<{ folderId?: string }>();
+  const { data: breadcrumb = [] } = useFolderBreadcrumb(folderId ?? "");
+
   const [selection, setSelection] = useState<Selection>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
@@ -58,6 +62,10 @@ export default function Documents() {
     setSelection({ item: doc, tab: "chat" });
   };
 
+  const handleBreadcrumbNavigate = (id: string | null) => {
+    navigate(id ? `/folders/${id}` : "/");
+  };
+
   return (
     <Layout>
       <PageWrapper>
@@ -66,6 +74,8 @@ export default function Documents() {
           onUpload={() => setUploadOpen(true)}
           onCreateFolder={() => setCreateFolderOpen(true)}
           onAddLink={() => setAddLinkOpen(true)}
+          breadcrumb={folderId ? breadcrumb : undefined}
+          onBreadcrumbNavigate={folderId ? handleBreadcrumbNavigate : undefined}
         />
 
         <LayoutArea>
@@ -80,6 +90,7 @@ export default function Documents() {
             <ContentLayout.Middle>
               <MiddleContent>
                 <ItemList
+                  parentId={folderId}
                   onSelect={handleSelect}
                   onChatOpen={handleChatOpen}
                   onFolderOpen={(id) => navigate(`/folders/${id}`)}
@@ -91,7 +102,7 @@ export default function Documents() {
 
             <ContentLayout.Right label="Details">
               {selection && (
-                <ItemDetailsPane
+                <DetailsPane
                   item={selection.item}
                   activeTab={selection.tab}
                   onClose={() => setSelection(null)}
@@ -102,9 +113,9 @@ export default function Documents() {
         </LayoutArea>
       </PageWrapper>
 
-      <FileUploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />
-      <CreateFolderDialog open={createFolderOpen} onClose={() => setCreateFolderOpen(false)} />
-      <AddLinkDialog open={addLinkOpen} onClose={() => setAddLinkOpen(false)} />
+      <FileUploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} folderId={folderId} />
+      <CreateFolderDialog open={createFolderOpen} onClose={() => setCreateFolderOpen(false)} parentId={folderId} />
+      <AddLinkDialog open={addLinkOpen} onClose={() => setAddLinkOpen(false)} folderId={folderId} />
     </Layout>
   );
 }
