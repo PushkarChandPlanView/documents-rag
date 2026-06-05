@@ -16,8 +16,9 @@ class ProcessingJob(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # Column named document_id for backward compat with workers' raw SQL
     document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True
     )
     stage: Mapped[str] = mapped_column(
         Enum(
@@ -38,4 +39,4 @@ class ProcessingJob(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    document: Mapped["Document"] = relationship("Document", back_populates="processing_jobs")
+    item: Mapped["Item"] = relationship("Item", back_populates="processing_jobs")  # type: ignore[name-defined]

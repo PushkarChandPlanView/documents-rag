@@ -8,11 +8,11 @@ from config import get_settings
 from .retriever import RetrievedChunk
 
 settings = get_settings()
+_enc = tiktoken.get_encoding("cl100k_base")
 
 
 def _count_tokens(text: str) -> int:
-    enc = tiktoken.get_encoding("cl100k_base")
-    return len(enc.encode(text))
+    return len(_enc.encode(text))
 
 
 def build_context(chunks: list[RetrievedChunk], token_budget: int | None = None) -> tuple[str, list[dict]]:

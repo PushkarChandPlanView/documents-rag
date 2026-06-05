@@ -22,7 +22,11 @@ async def run(
     """
     Full RAG pipeline — yields SSE-formatted tokens.
     """
+    def _status(msg: str) -> str:
+        return "data: " + json.dumps({"type": "status", "message": msg, "token": "", "sources": [], "done": False}) + "\n\n"
+
     # 1. Embed the query
+    yield _status("Searching documents…")
     query_embedding = await llm_client.embed(query)
 
     # 2. Retrieve top-k chunks from ChromaDB
@@ -43,9 +47,11 @@ async def run(
     )
     relevant_chunks = [c for c in chunks if c.score >= settings.rag_min_score]
     logger.info(
-        "%d chunks passed min_score=%.2f threshold",
+        "%d/%d chunks passed min_score=%.2f — all scores: %s",
         len(relevant_chunks),
+        len(chunks),
         settings.rag_min_score,
+        [round(c.score, 3) for c in chunks],
     )
     top_chunks = relevant_chunks[: settings.rag_top_k_rerank]
 
@@ -58,11 +64,15 @@ async def run(
         return
 
     # 5. Format prompt
+    yield _status("Generating answer…")
     prompt = QA_PROMPT.format(context=context_str, question=query)
 
     # 6. Stream LLM response
+    first_token = True
     async for token in llm_client.generate_stream(prompt):
-        yield "data: " + json.dumps({"token": token, "sources": [], "done": False}) + "\n\n"
+        if first_token:
+            first_token = False
+        yield "data: " + json.dumps({"type": "token", "token": token, "sources": [], "done": False}) + "\n\n"
 
     # 7. Send final SSE event with sources
-    yield "data: " + json.dumps({"token": "", "sources": sources, "done": True}) + "\n\n"
+    yield "data: " + json.dumps({"type": "token", "token": "", "sources": sources, "done": True}) + "\n\n"

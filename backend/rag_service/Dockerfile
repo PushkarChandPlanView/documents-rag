@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ENV TIKTOKEN_CACHE_DIR=/app/.tiktoken_cache
+RUN mkdir -p /app/.tiktoken_cache && \
+    python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+
 COPY . .
 
 RUN useradd -m appuser && chown -R appuser:appuser /app

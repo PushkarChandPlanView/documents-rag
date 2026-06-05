@@ -8,12 +8,27 @@ importers:
 
   .:
     dependencies:
+      '@planview/pv-details':
+        specifier: ^2.1.0
+        version: 2.1.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-filter':
+        specifier: ^3.0.2
+        version: 3.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-grid':
+        specifier: ^2.0.2
+        version: 2.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-icons':
+        specifier: ^3.0.0
+        version: 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-toolbar':
+        specifier: ^2.0.2
+        version: 2.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       '@planview/pv-uikit':
-        specifier: latest
-        version: 7.48.1(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+        specifier: ^8.0.4
+        version: 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       '@planview/pv-utilities':
-        specifier: latest
-        version: 4.25.2(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+        specifier: ^5.0.0
+        version: 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       '@tanstack/react-query':
         specifier: ^5.40.0
         version: 5.90.21(react@18.3.1)
@@ -26,6 +41,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-intl:
+        specifier: ^7.0.0
+        version: 7.1.14(react@18.3.1)(typescript@5.9.3)
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@18.3.28)(react@18.3.1)
@@ -40,7 +58,7 @@ importers:
         version: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       zustand:
         specifier: ^4.5.2
-        version: 4.5.7(@types/react@18.3.28)(react@18.3.1)
+        version: 4.5.7(@types/react@18.3.28)(immer@10.2.0)(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^20.14.0
@@ -427,30 +445,62 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@planview/pv-icons@2.32.1':
-    resolution: {integrity: sha512-aH7aL4OtD+L38ncFm9YI3zZhpKwJsWk6bG+CyG88WE2LTClucbyyRZBr2eFO8DEJRVcTAQo9k0WYbZjlu0S+KQ==}
+  '@planview/pv-details@2.1.0':
+    resolution: {integrity: sha512-8xm2MF5L6Xd0sgMr0MN6Ck1f+g1chQnMjlu4VjpCP670+sovZc6RPvO4nRcApjQun1r07Wq3vOZ856/+6OIcrw==}
     peerDependencies:
-      react: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0
+      react-intl: ^6.3.0 || ^7.0.0
+      styled-components: ^5.0.0 || ^6.0.0
+
+  '@planview/pv-filter@3.0.2':
+    resolution: {integrity: sha512-2LovRDjUegSeT2b2FkLsu0o5joI7uGaxfDGy3pU3ohqyR39RLAj9TY24N+STvuWYu0b5HnIgrtoUe9JnmBvuNA==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-intl: ^6.3.0 || ^7.0.0
+      styled-components: ^5.0.0 || ^6.0.0
+
+  '@planview/pv-form@2.0.0':
+    resolution: {integrity: sha512-5p/4pTEZty4bui8rCMyQG4eM3e08v4+4oTOulewvHc0w6OgYXKGHqjSyxGkjFY/IRGf1XyuIJzATUT/1hgm74Q==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-intl: ^6.3.0 || ^7.0.0
+      styled-components: ^5.0.0 || ^6.0.0
+
+  '@planview/pv-grid@2.0.2':
+    resolution: {integrity: sha512-0mdkjyMdYQeXr/PV2Kb2g5eHlQzl/c6ZMIEpwsYiuQkIzolZN4UA/5lHOC1dcmm0urH7iP8JP+a91RLcpKYbXQ==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-intl: ^6.3.0 || ^7.0.0
+      styled-components: ^5.0.0 || ^6.0.0
+
+  '@planview/pv-icons@3.0.0':
+    resolution: {integrity: sha512-BYI4iLtRRPjg+Ehpjbzi20CrLJ6bzzCwGorBwdr6fOGvwt73f1XEeXWBq7VpL+O73KGRp/vyrqAe4nXHcFhgCQ==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
       styled-components: ^5.0.0 || ^6.0.0
 
   '@planview/pv-tokens@1.4.0':
     resolution: {integrity: sha512-a5DEFb/xFtMYlgz3BotHejpTJpSE1xic/BARVkK74bHzV/fKEshr8IH4CFzwfvSTAhPvBG0YkOVB009Ka9Gicw==}
 
-  '@planview/pv-uikit@7.48.1':
-    resolution: {integrity: sha512-JRUahtJG2uAUSulN/YoqKIHAPKsyFdbDiCC4Cdo68IDWYvGtGitp8mSiJ+846cN1Y455SsT+kEO0nfYREgU4zQ==}
+  '@planview/pv-toolbar@2.0.2':
+    resolution: {integrity: sha512-AOQzqOqMSYcJvRpReCBW3wmbhcUCjzDDD1AO4XPfM9CYZrST4vCq9sU9hKnWMm4RDUfVah4IQ+/ijyusedEVKg==}
     peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0
       react-intl: ^6.3.0 || ^7.0.0
       styled-components: ^5.0.0 || ^6.0.0
 
-  '@planview/pv-utilities@4.25.2':
-    resolution: {integrity: sha512-0pKl6q939ySmIJvHhdBIBCDhanuqKqQs5Bb0npJZn/Jyd5heH1bFkbK539yW2Xlog6DEVKmpW+P5skCEf7hs4A==}
+  '@planview/pv-uikit@8.0.4':
+    resolution: {integrity: sha512-WhERLVfElPOWSduhxaTwAHvf/g2vjrnojhJEFPNcCJm8SkvQ7J9RJBdLi06zU8wbEbg1dfRpc+kIypHCwwJ3Bw==}
     peerDependencies:
-      react: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0
+      react-intl: ^6.3.0 || ^7.0.0
       styled-components: ^5.0.0 || ^6.0.0
 
-  '@popperjs/core@2.11.8':
-    resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
+  '@planview/pv-utilities@5.0.0':
+    resolution: {integrity: sha512-1JTkBqQFogKp8JPA0+9zOnub2mXwNpgPnzUzSStIS3WNjsikT1mi8Y4jgCM6ZRn+Zqis7hBHC2jyVIV6scMS3Q==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      styled-components: ^5.0.0 || ^6.0.0
 
   '@remix-run/router@1.23.2':
     resolution: {integrity: sha512-Ic6m2U/rMjTkhERIa/0ZtXJP17QUi2CbWE7cqx4J58M8aA3QTfW+2UlQ4psvTX9IO1RfNVhK3pcpdjej7L+t2w==}
@@ -591,6 +641,15 @@ packages:
     resolution: {integrity: sha512-0Lu6y5t+tvlTJMTO7oh5NSpJfpg/5D41LlThfepTixPYkJ0sE2Jj0m0f6yYqujBwIXlId87e234+MxG3D3g7kg==}
     peerDependencies:
       react: ^18 || ^19
+
+  '@tanstack/react-virtual@3.13.26':
+    resolution: {integrity: sha512-DosdgjOxCLahkn0o+ilmZYwEjo1glfMGuRT/j3PQ18yr5XqA8N/BCaL9IJ3B5TRl+nnzyK2IOFgAILwzN3a9xQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/virtual-core@3.16.0':
+    resolution: {integrity: sha512-Er2N7q3WOiH6y2JLxsxNX+u2/sLqSsL0bxFgDjuiPiA7vKhZRm+IzcS17vRee3GNXr64UsesA5CAp9yTiIYw9A==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -994,6 +1053,9 @@ packages:
   fast-levenshtein@2.0.6:
     resolution: {integrity: sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw==}
 
+  fast-sort@3.4.1:
+    resolution: {integrity: sha512-76uvGPsF6So53sZAqenP9UVT3p5l7cyTHkLWVCMinh41Y8NDrK1IYXJgaBMfc1gk7nJiSRZp676kddFG2Aa5+A==}
+
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
 
@@ -1114,6 +1176,9 @@ packages:
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
+
+  immer@10.2.0:
+    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -1485,9 +1550,6 @@ packages:
     peerDependencies:
       react: ^18.3.1
 
-  react-fast-compare@3.2.2:
-    resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
-
   react-intl@7.1.14:
     resolution: {integrity: sha512-VE/0Wi/lHJlBC7APQpCzLUdIt3GB5B0GZrRW8Q+ACbkHI4j+Wwgg9J1TniN6zmLHmPH5gxXcMy+fkSPfw5p1WQ==}
     peerDependencies:
@@ -1505,13 +1567,6 @@ packages:
     peerDependencies:
       '@types/react': '>=18'
       react: '>=18'
-
-  react-popper@2.3.0:
-    resolution: {integrity: sha512-e1hj8lL3uM+sgSR4Lxzn5h1GxBlpa4CQz0XLF8kx4MDrDRWY0Ena4c97PUeSX9i5W3UAfDP0z0FXCTQkoXUl3Q==}
-    peerDependencies:
-      '@popperjs/core': ^2.0.0
-      react: ^16.8.0 || ^17 || ^18
-      react-dom: ^16.8.0 || ^17 || ^18
 
   react-refresh@0.17.0:
     resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
@@ -1575,6 +1630,9 @@ packages:
 
   remark-stringify@11.0.0:
     resolution: {integrity: sha512-1OSmLd3awB/t8qdoEOMazZkNsfVTeY4fTsgzcQFdXNq8ToTN4ZGwrMnlda4K6smTFKD+GRV6O48i6Z4iKgPPpw==}
+
+  reselect@5.2.0:
+    resolution: {integrity: sha512-AgZ3UOZm3YndfrJ4OYjgrT7bmCm/1iqkjvEfH/oYjzh6PD2qw4QuT3jjnXIrpdt4MTpMXclMT3lXbmRY+XRakw==}
 
   resolve-from@4.0.0:
     resolution: {integrity: sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==}
@@ -1797,9 +1855,6 @@ packages:
         optional: true
       terser:
         optional: true
-
-  warning@4.0.3:
-    resolution: {integrity: sha512-rpJyN222KWIvHJ/F53XSZv0Zl/accqHR8et1kpaMTD/fLCRxtV8iX8czMzY7sVZupTI3zcUTg8eycS2kNF9l6w==}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -2181,7 +2236,74 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@planview/pv-icons@2.32.1(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+  '@planview/pv-details@2.1.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+    dependencies:
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-uikit': 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      react: 18.3.1
+      react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
+      styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - react-dom
+
+  '@planview/pv-filter@3.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+    dependencies:
+      '@dnd-kit/core': 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@dnd-kit/modifiers': 7.0.0(@dnd-kit/core@6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      '@floating-ui/react': 0.24.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@floating-ui/react-dom': 2.1.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@planview/pv-form': 2.0.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-toolbar': 2.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-uikit': 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      dayjs: 1.11.20
+      react: 18.3.1
+      react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
+      react-remove-scroll: 2.7.2(@types/react@18.3.28)(react@18.3.1)
+      styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - react-dom
+
+  '@planview/pv-form@2.0.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+    dependencies:
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-uikit': 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      react: 18.3.1
+      react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
+      styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - react-dom
+
+  '@planview/pv-grid@2.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+    dependencies:
+      '@dnd-kit/core': 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@dnd-kit/modifiers': 7.0.0(@dnd-kit/core@6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      '@dnd-kit/utilities': 3.2.2(react@18.3.1)
+      '@floating-ui/react-dom': 2.1.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-uikit': 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@tanstack/react-virtual': 3.13.26(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      fast-sort: 3.4.1
+      immer: 10.2.0
+      lodash.isequal: 4.5.0
+      lodash.throttle: 4.1.1
+      react: 18.3.1
+      react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
+      reselect: 5.2.0
+      styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      use-sync-external-store: 1.6.0(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - react-dom
+
+  '@planview/pv-icons@3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
     dependencies:
       '@planview/pv-tokens': 1.4.0
       react: 18.3.1
@@ -2189,7 +2311,22 @@ snapshots:
 
   '@planview/pv-tokens@1.4.0': {}
 
-  '@planview/pv-uikit@7.48.1(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+  '@planview/pv-toolbar@2.0.2(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+    dependencies:
+      '@floating-ui/core': 1.7.5
+      '@floating-ui/dom': 1.7.6
+      '@floating-ui/react-dom': 2.1.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-uikit': 8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      react: 18.3.1
+      react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
+      styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - react-dom
+
+  '@planview/pv-uikit@8.0.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-intl@7.1.14(react@18.3.1)(typescript@5.9.3))(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@dnd-kit/modifiers': 7.0.0(@dnd-kit/core@6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -2197,9 +2334,8 @@ snapshots:
       '@floating-ui/dom': 1.7.6
       '@floating-ui/react': 0.24.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@floating-ui/react-dom': 2.1.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@planview/pv-icons': 2.32.1(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
-      '@planview/pv-utilities': 4.25.2(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
-      '@popperjs/core': 2.11.8
+      '@planview/pv-icons': 3.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@planview/pv-utilities': 5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       color: 4.2.3
       dayjs: 1.11.20
       lodash.debounce: 4.0.8
@@ -2207,7 +2343,6 @@ snapshots:
       lodash.throttle: 4.1.1
       react: 18.3.1
       react-intl: 7.1.14(react@18.3.1)(typescript@5.9.3)
-      react-popper: 2.3.0(@popperjs/core@2.11.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-remove-scroll: 2.7.2(@types/react@18.3.28)(react@18.3.1)
       styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       use-sync-external-store: 1.6.0(react@18.3.1)
@@ -2215,14 +2350,12 @@ snapshots:
       - '@types/react'
       - react-dom
 
-  '@planview/pv-utilities@4.25.2(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
+  '@planview/pv-utilities@5.0.0(react@18.3.1)(styled-components@6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
     dependencies:
       '@planview/pv-tokens': 1.4.0
       react: 18.3.1
       styled-components: 6.3.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       use-sync-external-store: 1.6.0(react@18.3.1)
-
-  '@popperjs/core@2.11.8': {}
 
   '@remix-run/router@1.23.2': {}
 
@@ -2309,6 +2442,14 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.90.20
       react: 18.3.1
+
+  '@tanstack/react-virtual@3.13.26(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@tanstack/virtual-core': 3.16.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@tanstack/virtual-core@3.16.0': {}
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -2783,6 +2924,8 @@ snapshots:
 
   fast-levenshtein@2.0.6: {}
 
+  fast-sort@3.4.1: {}
+
   fastq@1.20.1:
     dependencies:
       reusify: 1.1.0
@@ -2924,6 +3067,8 @@ snapshots:
   html-url-attributes@3.0.1: {}
 
   ignore@5.3.2: {}
+
+  immer@10.2.0: {}
 
   import-fresh@3.3.1:
     dependencies:
@@ -3476,8 +3621,6 @@ snapshots:
       react: 18.3.1
       scheduler: 0.23.2
 
-  react-fast-compare@3.2.2: {}
-
   react-intl@7.1.14(react@18.3.1)(typescript@5.9.3):
     dependencies:
       '@formatjs/ecma402-abstract': 2.3.6
@@ -3511,14 +3654,6 @@ snapshots:
       vfile: 6.0.3
     transitivePeerDependencies:
       - supports-color
-
-  react-popper@2.3.0(@popperjs/core@2.11.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
-    dependencies:
-      '@popperjs/core': 2.11.8
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-      react-fast-compare: 3.2.2
-      warning: 4.0.3
 
   react-refresh@0.17.0: {}
 
@@ -3598,6 +3733,8 @@ snapshots:
       '@types/mdast': 4.0.4
       mdast-util-to-markdown: 2.1.2
       unified: 11.0.5
+
+  reselect@5.2.0: {}
 
   resolve-from@4.0.0: {}
 
@@ -3817,10 +3954,6 @@ snapshots:
       '@types/node': 20.19.37
       fsevents: 2.3.3
 
-  warning@4.0.3:
-    dependencies:
-      loose-envify: 1.4.0
-
   which@2.0.2:
     dependencies:
       isexe: 2.0.0
@@ -3833,11 +3966,12 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zustand@4.5.7(@types/react@18.3.28)(react@18.3.1):
+  zustand@4.5.7(@types/react@18.3.28)(immer@10.2.0)(react@18.3.1):
     dependencies:
       use-sync-external-store: 1.6.0(react@18.3.1)
     optionalDependencies:
       '@types/react': 18.3.28
+      immer: 10.2.0
       react: 18.3.1
 
   zwitch@2.0.4: {}

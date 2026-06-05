@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 
+import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config import get_settings
@@ -8,6 +9,7 @@ from config import get_settings
 settings = get_settings()
 
 _PAGE_MARKER_RE = re.compile(r"<<<PAGE_(\d+)>>>")
+_enc = tiktoken.get_encoding("cl100k_base")
 
 
 @dataclass
@@ -15,6 +17,7 @@ class Chunk:
     text: str
     chunk_index: int
     char_count: int
+    token_count: int
     page_number: int | None = None
 
 
@@ -27,11 +30,11 @@ def _extract_page_number(text: str) -> tuple[str, int]:
 
 
 def chunk(text: str) -> list[Chunk]:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
+    splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+        encoding_name="cl100k_base",
+        chunk_size=settings.chunk_size,      # tokens
+        chunk_overlap=settings.chunk_overlap,  # tokens
         separators=["\n\n", "\n", ". ", " ", ""],
-        length_function=len,
     )
     splits = splitter.split_text(text)
     chunks = []
@@ -41,6 +44,7 @@ def chunk(text: str) -> list[Chunk]:
             text=clean_text,
             chunk_index=i,
             char_count=len(clean_text),
+            token_count=len(_enc.encode(clean_text)),
             page_number=page_number,
         ))
     return chunks

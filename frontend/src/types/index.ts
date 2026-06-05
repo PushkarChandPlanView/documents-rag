@@ -13,23 +13,76 @@ export interface ProcessingJob {
   completed_at: string | null;
 }
 
-export interface Document {
+// ── Unified list items (from GET /documents) ──────────────────────────────────
+
+export interface FolderItem {
+  type: "folder";
+  id: string;
+  name: string;
+  description: string | null;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentItem {
+  type: "document";
+  id: string;
+  filename: string;        // mapped from items.name
+  description: string | null;
+  mime_type: string;
+  file_size_bytes: number;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  folder_id: string | null;
+  folder_name: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+  processing_jobs: ProcessingJob[];
+}
+
+export type UnifiedItem = FolderItem | DocumentItem;
+
+export interface UnifiedListResponse {
+  items: UnifiedItem[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+// ── Single-document detail (from GET /documents/:id) ─────────────────────────
+
+export interface DocumentDetailResponse {
+  type: "document";
   id: string;
   filename: string;
   mime_type: string;
   file_size_bytes: number;
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  folder_id: string | null;
+  folder_name: string | null;
+  source_url: string | null;
   summary: string | null;
   created_at: string;
   updated_at: string;
   processing_jobs: ProcessingJob[];
 }
 
-export interface DocumentListResponse {
-  items: Document[];
+// ── Legacy alias (kept for backward compat in non-refactored components) ──────
+export type Document = DocumentDetailResponse;
+
+// ── Other response types ──────────────────────────────────────────────────────
+
+export interface Folder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderListResponse {
+  items: Folder[];
   total: number;
-  offset: number;
-  limit: number;
 }
 
 export interface UploadResponse {
@@ -62,6 +115,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  status?: string;
   sources?: Array<{
     chunk_id: string;
     document_id: string;

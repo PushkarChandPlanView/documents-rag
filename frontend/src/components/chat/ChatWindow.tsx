@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { streamChat } from "@/api/chat";
@@ -94,6 +94,31 @@ const Bubble = styled.div<{ $isUser: boolean }>`
 
 const UserText = styled.p`margin: 0; white-space: pre-wrap;`;
 
+const StatusText = styled.p`
+  margin: 0;
+  color: #888;
+  font-size: 0.85rem;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &::after {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #888;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+`;
+
 const SourcesSection = styled.div`
   margin-top: 0.5rem;
   border-top: 1px solid #e0e0e0;
@@ -119,7 +144,9 @@ function Message({ msg }: { msg: ChatMessage }) {
       <Bubble $isUser={isUser}>
         {isUser
           ? <UserText>{msg.content}</UserText>
-          : <AssistantMarkdown content={msg.content} />
+          : msg.status && !msg.content
+            ? <StatusText>{msg.status}</StatusText>
+            : <AssistantMarkdown content={msg.content} />
         }
         {msg.sources && msg.sources.length > 0 && (
           <SourcesSection>
@@ -236,17 +263,24 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
 
     try {
       for await (const event of streamChat(userMsg.content, documentId ? [documentId] : undefined)) {
-        if (event.token) {
+        if (event.type === "status" && event.message) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...updated[updated.length - 1], status: event.message };
+            return updated;
+          });
+        } else if (event.token) {
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {
               ...updated[updated.length - 1],
+              status: undefined,
               content: updated[updated.length - 1].content + event.token,
             };
             return updated;
           });
         }
-        if (event.done && event.sources.length > 0) {
+        if (event.done && event.sources && event.sources.length > 0) {
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {

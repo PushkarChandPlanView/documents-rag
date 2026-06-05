@@ -20,7 +20,7 @@ from .strategies import map_reduce, single_pass
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-TOKEN_THRESHOLD = 8000
+TOKEN_THRESHOLD = 12000
 
 
 def count_tokens(text: str) -> int:
@@ -77,13 +77,35 @@ class SummarizationConsumer(BaseConsumer):
             doc_id, strategy, token_count,
         )
 
-        # Persist summary and mark document COMPLETED
+        # Persist versioned summary and mark document COMPLETED
         async with await db_client.get_session() as session:
+            # Deactivate any previous active summaries for this document
             await session.execute(
                 sql_text(
-                    "UPDATE documents SET summary = :summary, status = 'COMPLETED', updated_at = now() "
-                    "WHERE id = :doc_id"
-                ).bindparams(summary=summary, doc_id=event.document_id)
+                    "UPDATE document_summaries SET is_active = false WHERE document_id = :doc_id"
+                ).bindparams(doc_id=event.document_id)
+            )
+            # Insert the new active summary (version = previous max + 1)
+            await session.execute(
+                sql_text(
+                    "INSERT INTO document_summaries "
+                    "  (document_id, summary, model, strategy, version, is_active) "
+                    "VALUES ("
+                    "  :doc_id, :summary, :model, :strategy, "
+                    "  COALESCE((SELECT MAX(version) FROM document_summaries WHERE document_id = :doc_id), 0) + 1, "
+                    "  true"
+                    ")"
+                ).bindparams(
+                    doc_id=event.document_id,
+                    summary=summary,
+                    model=settings.ollama_llm_model,
+                    strategy=strategy,
+                )
+            )
+            await session.execute(
+                sql_text(
+                    "UPDATE items SET status = 'COMPLETED', updated_at = now() WHERE id = :doc_id"
+                ).bindparams(doc_id=event.document_id)
             )
             await session.execute(
                 sql_text(

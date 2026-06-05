@@ -10,17 +10,28 @@
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {
-    "@planview/pv-uikit": "latest",
-    "@planview/pv-utilities": "latest",
+    "@planview/pv-details": "^2.1.0",
+    "@planview/pv-filter": "^3.0.2",
+    "@planview/pv-grid": "^2.0.2",
+    "@planview/pv-icons": "^3.0.0",
+    "@planview/pv-toolbar": "^2.0.2",
+    "@planview/pv-uikit": "^8.0.4",
+    "@planview/pv-utilities": "^5.0.0",
     "@tanstack/react-query": "^5.40.0",
     "axios": "^1.7.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-intl": "^7.0.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.23.1",
     "remark-gfm": "^4.0.1",
     "styled-components": "^6.3.11",
     "zustand": "^4.5.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

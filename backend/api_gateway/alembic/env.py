@@ -9,7 +9,7 @@ from models.base import Base
 
 # Import all models so Alembic can detect them
 import models.user  # noqa
-import models.document  # noqa
+import models.item  # noqa
 import models.processing_job  # noqa
 
 config = context.config

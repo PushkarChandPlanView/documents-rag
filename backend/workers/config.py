@@ -42,10 +42,10 @@ class WorkerSettings(BaseSettings):
     ollama_temperature: float = 0.1
     ollama_num_ctx: int = 4096
 
-    # Chunking
-    chunk_size: int = 1000
-    chunk_overlap: int = 200
-    semantic_chunk_threshold_chars: int = 50_000
+    # Chunking — units are TOKENS (cl100k_base), not characters
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    semantic_chunk_threshold_chars: int = 50_000  # still chars — document-size gate
 
 
 @lru_cache

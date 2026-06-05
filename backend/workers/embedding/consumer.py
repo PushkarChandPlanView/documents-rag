@@ -7,6 +7,7 @@ Writes to: ChromaDB
 import logging
 from uuid import UUID
 
+import tiktoken
 from aiokafka import ConsumerRecord
 from sqlalchemy import text as sql_text
 
@@ -19,6 +20,8 @@ from .ollama_embedder import embed_batch
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_enc = tiktoken.get_encoding("cl100k_base")
 
 
 class EmbeddingConsumer(BaseConsumer):
@@ -55,17 +58,17 @@ class EmbeddingConsumer(BaseConsumer):
         if not rows:
             raise ValueError(f"No chunks found for document_id={doc_id}")
 
-        # Fetch document name and file type
+        # Fetch document name and mime type from items table
         async with await db_client.get_session() as session:
             doc_result = await session.execute(
                 sql_text(
-                    "SELECT filename, file_type FROM documents WHERE id = :doc_id"
+                    "SELECT name, mime_type FROM items WHERE id = :doc_id"
                 ).bindparams(doc_id=event.document_id)
             )
             doc_row = doc_result.fetchone()
 
-        document_name = doc_row.filename if doc_row else doc_id
-        file_type = doc_row.file_type if doc_row else "unknown"
+        document_name = doc_row.name if doc_row else doc_id
+        file_type = doc_row.mime_type if doc_row else "unknown"
 
         chunk_ids = [str(row.id) for row in rows]
         chunk_texts = [row.text for row in rows]
@@ -74,11 +77,22 @@ class EmbeddingConsumer(BaseConsumer):
         char_counts = [row.char_count for row in rows]
         total_chunks = len(rows)
 
-        # Generate embeddings via Ollama
-        embeddings = await embed_batch(chunk_texts)
+        # Build contextual prefix texts for embedding.
+        # The prefix anchors each chunk to its document and position, improving
+        # retrieval accuracy without polluting the stored document text.
+        contextualized = [
+            f"Document: {document_name} ({file_type})\n\nChunk {chunk_indices[i] + 1} of {total_chunks}:\n{chunk_texts[i]}"
+            for i in range(total_chunks)
+        ]
+
+        # Generate embeddings via Ollama (uses contextualized texts)
+        embeddings = await embed_batch(contextualized)
         embedding_dim = len(embeddings[0]) if embeddings else 0
 
-        # Write to ChromaDB
+        # Compute token counts on original chunk texts (what the LLM will read)
+        token_counts = [len(_enc.encode(t)) for t in chunk_texts]
+
+        # Write to ChromaDB — store ORIGINAL chunk text, not the prefixed version
         collection = chroma_client.get_or_create_collection()
         metadatas = [
             {
@@ -89,6 +103,7 @@ class EmbeddingConsumer(BaseConsumer):
                 "document_name": document_name,
                 "file_type": file_type,
                 "char_count": char_counts[i] if char_counts[i] is not None else 0,
+                "token_count": token_counts[i],
                 "total_chunks": total_chunks,
             }
             for i in range(len(chunk_ids))

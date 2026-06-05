@@ -55,18 +55,35 @@ class ChunkingConsumer(BaseConsumer):
 
         logger.info("Created %d chunks using strategy=%s for document_id=%s", len(chunks), strategy, doc_id)
 
-        # Bulk insert all chunks in a single query
-        params: dict = {"document_id": event.document_id}
-        placeholders = []
-        for i, chunk in enumerate(chunks):
-            params[f"id{i}"] = uuid.uuid4()
-            params[f"ci{i}"] = chunk.chunk_index
-            params[f"t{i}"] = chunk.text
-            params[f"cc{i}"] = chunk.char_count
-            params[f"pn{i}"] = chunk.page_number
-            placeholders.append(f"(:id{i}, :document_id, :ci{i}, :t{i}, :cc{i}, :pn{i})")
+        if not chunks:
+            # No text could be extracted — mark everything FAILED and stop the pipeline
+            logger.warning("No chunks produced for document_id=%s — marking FAILED", doc_id)
+            async with await db_client.get_session() as session:
+                await session.execute(
+                    sql_text(
+                        "UPDATE processing_jobs SET status = 'FAILED', completed_at = now() "
+                        "WHERE document_id = :doc_id AND stage = 'CHUNKING'"
+                    ).bindparams(doc_id=event.document_id)
+                )
+                await session.execute(
+                    sql_text(
+                        "UPDATE items SET status = 'FAILED', updated_at = now() WHERE id = :doc_id"
+                    ).bindparams(doc_id=event.document_id)
+                )
+                await session.commit()
+            return
 
+        # Bulk insert all chunks in a single query
         async with await db_client.get_session() as session:
+            params: dict = {"document_id": event.document_id}
+            placeholders = []
+            for i, chunk in enumerate(chunks):
+                params[f"id{i}"] = uuid.uuid4()
+                params[f"ci{i}"] = chunk.chunk_index
+                params[f"t{i}"] = chunk.text
+                params[f"cc{i}"] = chunk.char_count
+                params[f"pn{i}"] = chunk.page_number
+                placeholders.append(f"(:id{i}, :document_id, :ci{i}, :t{i}, :cc{i}, :pn{i})")
             await session.execute(
                 sql_text(
                     "INSERT INTO document_chunks (id, document_id, chunk_index, text, char_count, page_number) "

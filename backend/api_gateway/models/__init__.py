@@ -1,6 +1,6 @@
 from .base import Base
-from .user import User
-from .document import Document, DocumentChunk
+from .item import DocumentChunk, DocumentSummary, Item
 from .processing_job import ProcessingJob
+from .user import User
 
-__all__ = ["Base", "User", "Document", "DocumentChunk", "ProcessingJob"]
+__all__ = ["Base", "DocumentChunk", "DocumentSummary", "Item", "ProcessingJob", "User"]

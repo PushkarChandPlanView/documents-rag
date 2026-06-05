@@ -15,7 +15,7 @@ from base.base_producer import publish
 from config import get_settings
 from shared import db_client, minio_client
 from shared.schemas import DocumentUploadedEvent, TextExtractedEvent, Topics
-from .extractors import docx_extractor, pdf_extractor, txt_extractor
+from .extractors import docx_extractor, pdf_extractor, pptx_extractor, txt_extractor, url_extractor, xlsx_extractor
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -25,6 +25,12 @@ MIME_EXTRACTOR_MAP = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": docx_extractor.extract,
     "application/msword": docx_extractor.extract,
     "text/plain": txt_extractor.extract,
+    "text/markdown": txt_extractor.extract,
+    "text/csv": txt_extractor.extract,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": xlsx_extractor.extract,
+    "application/vnd.ms-excel": xlsx_extractor.extract,
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": pptx_extractor.extract,
+    "application/vnd.ms-powerpoint": pptx_extractor.extract,
 }
 
 
@@ -38,7 +44,7 @@ class TextExtractionConsumer(BaseConsumer):
     async def process_message(self, message: ConsumerRecord) -> None:
         event = DocumentUploadedEvent.from_json(message.value)
         doc_id = str(event.document_id)
-        logger.info("Processing text extraction for document_id=%s", doc_id)
+        logger.info("Processing text extraction for document_id=%s mime=%s", doc_id, event.mime_type)
 
         async with await db_client.get_session() as session:
             # Mark TEXT_EXTRACTION as IN_PROGRESS
@@ -47,15 +53,20 @@ class TextExtractionConsumer(BaseConsumer):
             )
             await session.commit()
 
-        # Download raw file from MinIO
-        file_bytes = minio_client.download(settings.minio_bucket_raw, event.minio_key)
+        # Link documents: fetch URL content instead of downloading from MinIO
+        if event.mime_type == "text/html" and not event.minio_key:
+            source_url = await _get_source_url(event.document_id)
+            if not source_url:
+                raise ValueError(f"No source_url for link document {doc_id}")
+            result = url_extractor.extract_from_url(source_url)
+        else:
+            # Download raw file from MinIO
+            file_bytes = minio_client.download(settings.minio_bucket_raw, event.minio_key)
 
-        # Extract text
-        extractor = MIME_EXTRACTOR_MAP.get(event.mime_type)
-        if not extractor:
-            raise ValueError(f"No extractor for mime_type: {event.mime_type}")
-
-        result = extractor(file_bytes)
+            extractor = MIME_EXTRACTOR_MAP.get(event.mime_type)
+            if not extractor:
+                raise ValueError(f"No extractor for mime_type: {event.mime_type}")
+            result = extractor(file_bytes)
 
         # Detect language
         try:
@@ -94,6 +105,16 @@ class TextExtractionConsumer(BaseConsumer):
             key=doc_id,
         )
         logger.info("Text extraction complete for document_id=%s chars=%d", doc_id, len(result.text))
+
+
+async def _get_source_url(document_id) -> str | None:
+    from sqlalchemy import select, text as sql_text
+    async with await db_client.get_session() as session:
+        result = await session.execute(
+            sql_text("SELECT source_url FROM items WHERE id = :doc_id").bindparams(doc_id=document_id)
+        )
+        row = result.fetchone()
+        return row[0] if row else None
 
 
 def update_processing_job(document_id, stage: str, status: str, completed: bool = False):

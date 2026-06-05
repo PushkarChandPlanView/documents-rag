@@ -1,12 +1,24 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useAuthStore } from "@/store/authStore";
-
-const NAV_ITEMS = [
-  { path: "/", label: "Dashboard" },
-  { path: "/documents", label: "Documents" },
-  { path: "/search", label: "Search" },
-];
+import {
+  NavigationBar,
+  SearchInput,
+  ToolbarButtonEmptyInverse,
+  ToolbarSectionLeft,
+  ToolbarSectionRight,
+  UserMenu,
+} from "@planview/pv-toolbar";
+import {
+  Notification,
+  Settings,
+  Help,
+  Support,
+  Logout,
+  LogoProjectplace,
+} from "@planview/pv-icons";
+import { Avatar, ListItem } from "@planview/pv-uikit";
 
 const Wrapper = styled.div`
   display: flex;
@@ -14,73 +26,19 @@ const Wrapper = styled.div`
   height: 100%;
   font-family: system-ui, sans-serif;
   position: relative;
-`;
-
-const Sidebar = styled.nav`
-  width: 220px;
-  background: #1e1e2e;
-  color: #fff;
-  display: flex;
   flex-direction: column;
-  padding: 1.5rem 0;
-`;
-
-const SidebarHeader = styled.div`
-  padding: 0 1.5rem 1.5rem;
-  border-bottom: 1px solid #333;
-  font-weight: 700;
-  font-size: 1rem;
-`;
-
-const NavList = styled.div`
-  flex: 1;
-  padding: 1rem 0;
-`;
-
-const NavLink = styled(Link)<{ $active: boolean }>`
-  display: block;
-  padding: 0.625rem 1.5rem;
-  color: inherit;
-  text-decoration: none;
-  font-size: 0.9rem;
-  background: ${({ $active }) => ($active ? "#333" : "transparent")};
-  border-left: 3px solid ${({ $active }) => ($active ? "#4f9cf9" : "transparent")};
-`;
-
-const SidebarFooter = styled.div`
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #333;
-  font-size: 0.8rem;
-  color: #aaa;
-`;
-
-const UserEmail = styled.div`
-  margin-bottom: 0.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const LogoutButton = styled.button`
-  background: none;
-  border: 1px solid #555;
-  color: #aaa;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
 `;
 
 const Main = styled.main`
   height: 100%;
   width: 100%;
   background: #f8f9fa;
+  box-sizing: border-box;
 `;
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
   const navigate = useNavigate();
-  const { userEmail, logout } = useAuthStore();
+  const { logout } = useAuthStore();
 
   const handleLogout = () => {
     logout();
@@ -89,24 +47,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <Wrapper>
-      <Sidebar>
-        <SidebarHeader>Document Intel</SidebarHeader>
-        <NavList>
-          {NAV_ITEMS.map(({ path, label }) => (
-            <NavLink key={path} to={path} $active={location.pathname === path}>
-              {label}
-            </NavLink>
-          ))}
-        </NavList>
-        <SidebarFooter>
-          <UserEmail>{userEmail}</UserEmail>
-          <LogoutButton onClick={handleLogout}>Sign Out</LogoutButton>
-        </SidebarFooter>
-      </Sidebar>
+      <NavigationBar aria-label="Main navigation" logo={<LogoProjectplace title="Planview Advisor" />}>
+        <ToolbarSectionLeft>
+          <ToolbarButtonEmptyInverse onClick={() => navigate("/")}>Overview</ToolbarButtonEmptyInverse>
+          <ToolbarButtonEmptyInverse onClick={() => navigate("/documents")}>Documents</ToolbarButtonEmptyInverse>
+        </ToolbarSectionLeft>
+        <ToolbarSectionRight moreMenuLabel="More actions">
+          <SearchInput />
+          <ToolbarButtonEmptyInverse icon={<Notification />} tooltip="Notifications" />
+          <UserMenu triggerElement={<Avatar aria-label="Design System avatar" initials="PC" />}>
+            <ListItem icon={<Settings />} label="Settings" />
+            <ListItem icon={<Help />} label="Help" />
+            <ListItem icon={<Support />} label="Customer support" />
+            <ListItem onActivate={handleLogout} icon={<Logout />} label="Log out" />
+          </UserMenu>
+        </ToolbarSectionRight>
+      </NavigationBar>
 
-      <Main>
-       {children}
-      </Main>
+      <Main>{children}</Main>
     </Wrapper>
   );
 }
