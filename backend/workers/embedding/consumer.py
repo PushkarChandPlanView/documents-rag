@@ -15,8 +15,8 @@ from base.base_consumer import BaseConsumer
 from base.base_producer import publish
 from config import get_settings
 from shared import pgvector_client, db_client
+from shared.providers import llm_factory
 from shared.schemas import DocumentChunkedEvent, EmbeddingsGeneratedEvent, Topics
-from .ollama_embedder import embed_batch
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -85,8 +85,8 @@ class EmbeddingConsumer(BaseConsumer):
             for i in range(total_chunks)
         ]
 
-        # Generate embeddings via Ollama (uses contextualized texts)
-        embeddings = await embed_batch(contextualized)
+        # Generate embeddings via configured provider (uses contextualized texts)
+        embeddings = await llm_factory.embed_batch(contextualized)
         embedding_dim = len(embeddings[0]) if embeddings else 0
 
         # Compute token counts on original chunk texts (what the LLM will read)

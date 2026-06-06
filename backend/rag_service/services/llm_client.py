@@ -1,54 +1,63 @@
 """
-Async Ollama LLM client.
-Supports both streaming and non-streaming generation.
-"""
-import json
-from typing import AsyncGenerator
+LLM client — provider-agnostic factory proxy.
 
-import httpx
+Reads LLM_PROVIDER / EMBED_PROVIDER from config and delegates to either:
+  - OllamaProvider  (default, local)
+  - BedrockProvider (AWS)
+
+All callers (rag_chain.py, retriever.py, etc.) import from here unchanged.
+"""
+import logging
+from typing import AsyncGenerator
 
 from config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
+_llm_provider = None
+_embed_provider = None
 
-async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
-    """Stream tokens from Ollama /api/generate."""
-    payload = {
-        "model": settings.ollama_llm_model,
-        "prompt": prompt,
-        "stream": True,
-        "options": {
-            "temperature": settings.ollama_temperature,
-            "num_ctx": settings.ollama_num_ctx,
-            "num_predict": settings.ollama_num_predict,
-        },
-    }
-    client = httpx.AsyncClient(timeout=300)
-    try:
-        async with client.stream("POST", f"{settings.ollama_base_url}/api/generate", json=payload) as resp:
-            resp.raise_for_status()
-            async for line in resp.aiter_lines():
-                if line.strip():
-                    try:
-                        data = json.loads(line)
-                        token = data.get("response", "")
-                        if token:
-                            yield token
-                        if data.get("done"):
-                            break
-                    except json.JSONDecodeError:
-                        continue
-    finally:
-        await client.aclose()
+
+def _get_llm_provider():
+    global _llm_provider
+    if _llm_provider is None:
+        if settings.llm_provider == "bedrock":
+            from services.providers.bedrock import BedrockProvider
+            _llm_provider = BedrockProvider()
+            logger.info("LLM provider: AWS Bedrock (%s)", settings.bedrock_llm_model)
+        else:
+            from services.providers.ollama import OllamaProvider
+            _llm_provider = OllamaProvider()
+            logger.info("LLM provider: Ollama (%s)", settings.ollama_llm_model)
+    return _llm_provider
+
+
+def _get_embed_provider():
+    global _embed_provider
+    if _embed_provider is None:
+        if settings.embed_provider == "bedrock":
+            from services.providers.bedrock import BedrockProvider
+            _embed_provider = BedrockProvider()
+            logger.info("Embed provider: AWS Bedrock (%s)", settings.bedrock_embed_model)
+        else:
+            from services.providers.ollama import OllamaProvider
+            _embed_provider = OllamaProvider()
+            logger.info("Embed provider: Ollama (%s)", settings.ollama_embed_model)
+    return _embed_provider
 
 
 async def embed(text: str) -> list[float]:
-    """Generate embedding vector for a single text."""
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/embeddings",
-            json={"model": settings.ollama_embed_model, "prompt": text},
-        )
-        resp.raise_for_status()
-        return resp.json()["embedding"]
+    """Generate an embedding vector for a single text."""
+    return await _get_embed_provider().embed(text)
+
+
+async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
+    """Stream response tokens for a prompt."""
+    async for token in _get_llm_provider().generate_stream(prompt):
+        yield token
+
+
+async def generate(prompt: str) -> str:
+    """Non-streaming generation — returns full response string."""
+    return await _get_llm_provider().generate(prompt)

@@ -1,17 +1,13 @@
 """
-Map-Reduce summarization for large documents (> 8k tokens).
-1. Map: summarize each chunk concurrently (Semaphore limits Ollama load)
+Map-Reduce summarization for large documents (> TOKEN_THRESHOLD tokens).
+1. Map: summarize each chunk concurrently (Semaphore limits LLM load)
 2. Reduce: summarize all chunk summaries into a final summary
 """
 import asyncio
 
-import httpx
+from shared.providers import llm_factory
 
-from config import get_settings
-
-settings = get_settings()
-
-# Max concurrent LLM calls during map phase — lower than embedding (heavier inference)
+# Max concurrent LLM calls during map phase
 CONCURRENCY = 4
 # Sample at most this many chunks evenly from the document — keeps LLM calls bounded
 MAX_MAP_CHUNKS = 30
@@ -31,18 +27,8 @@ Section summaries:
 Final document summary:"""
 
 
-async def _summarize_chunk(client: httpx.AsyncClient, text: str) -> str:
-    resp = await client.post(
-        f"{settings.ollama_base_url}/api/generate",
-        json={
-            "model": settings.ollama_llm_model,
-            "prompt": CHUNK_PROMPT.format(text=text[:3000]),
-            "stream": False,
-            "options": {"temperature": settings.ollama_temperature},
-        },
-    )
-    resp.raise_for_status()
-    return resp.json()["response"].strip()
+async def _summarize_chunk(text: str) -> str:
+    return await llm_factory.generate(CHUNK_PROMPT.format(text=text[:3000]))
 
 
 async def summarize(chunks: list[str]) -> str:
@@ -55,20 +41,8 @@ async def summarize(chunks: list[str]) -> str:
 
     async def _bounded(chunk_text: str) -> str:
         async with sem:
-            return await _summarize_chunk(client, chunk_text)
+            return await _summarize_chunk(chunk_text)
 
-    async with httpx.AsyncClient(timeout=600) as client:
-        chunk_summaries = await asyncio.gather(*[_bounded(c) for c in chunks])
-
-        combined = "\n\n".join(f"- {s}" for s in chunk_summaries)
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/generate",
-            json={
-                "model": settings.ollama_llm_model,
-                "prompt": REDUCE_PROMPT.format(summaries=combined[:8000]),
-                "stream": False,
-                "options": {"temperature": settings.ollama_temperature},
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["response"].strip()
+    chunk_summaries = await asyncio.gather(*[_bounded(c) for c in chunks])
+    combined = "\n\n".join(f"- {s}" for s in chunk_summaries)
+    return await llm_factory.generate(REDUCE_PROMPT.format(summaries=combined[:8000]))

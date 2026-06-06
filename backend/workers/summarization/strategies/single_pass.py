@@ -1,9 +1,5 @@
-"""Single-pass summarization for documents ≤ 8k tokens."""
-import httpx
-
-from config import get_settings
-
-settings = get_settings()
+"""Single-pass summarization for documents ≤ TOKEN_THRESHOLD tokens."""
+from shared.providers import llm_factory
 
 SUMMARIZE_PROMPT = """You are a document summarization assistant.
 Provide a clear, concise summary of the following document text.
@@ -18,18 +14,4 @@ Summary:"""
 
 async def summarize(text: str) -> str:
     prompt = SUMMARIZE_PROMPT.format(text=text[:12000])  # safety truncation
-    async with httpx.AsyncClient(timeout=600) as client:
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/generate",
-            json={
-                "model": settings.ollama_llm_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": settings.ollama_temperature,
-                    "num_ctx": settings.ollama_num_ctx,
-                },
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["response"].strip()
+    return await llm_factory.generate(prompt)

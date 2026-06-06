@@ -37,6 +37,18 @@ class WorkerSettings(BaseSettings):
     ollama_temperature: float = 0.1
     ollama_num_ctx: int = 4096
 
+    # ── Provider selection ────────────────────────────────────────────────────
+    # "ollama" (default, local) or "bedrock" (AWS)
+    llm_provider: str = "ollama"
+    embed_provider: str = "ollama"
+
+    # ── AWS Bedrock ───────────────────────────────────────────────────────────
+    aws_region: str = "us-east-1"
+    bedrock_llm_model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_embed_model: str = "amazon.titan-embed-text-v2:0"
+    bedrock_temperature: float = 0.1
+    bedrock_max_tokens: int = 512
+
     # Chunking — units are TOKENS (cl100k_base), not characters
     chunk_size: int = 512
     chunk_overlap: int = 64

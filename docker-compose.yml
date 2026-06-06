@@ -3,6 +3,14 @@ version: "3.9"
 x-common-env: &common-env
   env_file: .env
 
+x-aws-env: &aws-env
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+  LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+  EMBED_PROVIDER: ${EMBED_PROVIDER:-ollama}
+
 networks:
   public:
     driver: bridge
@@ -269,14 +277,13 @@ services:
     restart: unless-stopped
     <<: *common-env
     environment:
+      <<: *aws-env
       WORKER_TYPE: embedding
     depends_on:
       kafka:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      ollama-init:
-        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
     networks: [internal]
@@ -294,14 +301,13 @@ services:
     restart: unless-stopped
     <<: *common-env
     environment:
+      <<: *aws-env
       WORKER_TYPE: summarization
     depends_on:
       kafka:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      ollama-init:
-        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
     networks: [internal]
@@ -318,9 +324,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     <<: *common-env
+    environment:
+      <<: *aws-env
     depends_on:
-      ollama-init:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     networks: [internal]

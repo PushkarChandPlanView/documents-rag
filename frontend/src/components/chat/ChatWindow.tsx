@@ -169,7 +169,7 @@ function Message({ msg }: { msg: ChatMessage }) {
 const WindowWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 4rem);
+  height: calc(100vh - 10rem);
 `;
 
 const MessageList = styled.div`
