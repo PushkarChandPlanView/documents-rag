@@ -10,6 +10,7 @@ import { queryClient } from "@/store/queryClient";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import Login from "@/pages/Login";
 import Documents from "@/pages/Documents";
+import { SearchBar } from "./components/search/SearchBar";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Documents />} />
+            <Route path="/search" element={<SearchBar />} />
             <Route path="/folders/:folderId" element={<Documents />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

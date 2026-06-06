@@ -18,20 +18,20 @@ class RAGSettings(BaseSettings):
     ollama_embed_model: str = "nomic-embed-text"
     ollama_temperature: float = 0.1
     ollama_num_ctx: int = 4096
-    ollama_num_predict: int = 512
+    ollama_num_predict: int = 1024
 
     # ── AWS Bedrock ───────────────────────────────────────────────────────────
     aws_region: str = "us-east-1"
     bedrock_llm_model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
     bedrock_embed_model: str = "amazon.titan-embed-text-v2:0"
     bedrock_temperature: float = 0.1
-    bedrock_max_tokens: int = 512
+    bedrock_max_tokens: int = 1024
 
     # ── RAG ───────────────────────────────────────────────────────────────────
     rag_top_k_retrieve: int = 20
-    rag_top_k_rerank: int = 5
+    rag_top_k_rerank: int = 8
     rag_min_score: float = 0.10
-    rag_context_token_budget: int = 2500
+    rag_context_token_budget: int = 3500
 
 
 @lru_cache

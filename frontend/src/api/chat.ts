@@ -1,4 +1,5 @@
 import { useAuthStore } from "@/store/authStore";
+import type { DocumentSearchResponse } from "@/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -74,6 +75,24 @@ export const searchApi = {
       body: JSON.stringify({ query, document_ids: documentIds, top_k: topK }),
     });
     if (!res.ok) throw new Error("Search failed");
+    return res.json();
+  },
+
+  searchDocuments: async (
+    query: string,
+    documentIds?: string[],
+    topK = 10
+  ): Promise<DocumentSearchResponse> => {
+    const token = useAuthStore.getState().accessToken;
+    const res = await fetch(`${API_URL}/search/documents`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, document_ids: documentIds ?? null, top_k: topK }),
+    });
+    if (!res.ok) throw new Error("Document search failed");
     return res.json();
   },
 };

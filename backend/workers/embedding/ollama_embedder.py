@@ -10,6 +10,7 @@ import asyncio
 import logging
 
 import httpx
+import tiktoken
 
 from config import get_settings
 
@@ -20,6 +21,23 @@ BATCH_SIZE = 32
 CONCURRENCY = 4   # concurrent batch requests
 _use_batch_api: bool | None = None  # resolved on first call; reset on API failure
 
+# mxbai-embed-large (and similar BERT-style models) has a 512-token context.
+# BERT tokenizers produce ~1.8× more tokens than cl100k_base for the same text,
+# so we cap at embed_chunk_max_tokens (240 cl100k) which gives ~450 BERT tokens,
+# leaving room for Ollama's overhead and the document-name prefix.
+# This also prevents 400 errors from Ollama versions that ignore truncate:true.
+_MAX_TOKENS = settings.embed_chunk_max_tokens
+_enc = tiktoken.get_encoding("cl100k_base")
+
+
+def _truncate(text: str) -> str:
+    tokens = _enc.encode(text)
+    if len(tokens) <= _MAX_TOKENS:
+        return text
+    truncated = _enc.decode(tokens[:_MAX_TOKENS])
+    logger.warning("Truncated text from %d to %d cl100k tokens before embedding", len(tokens), _MAX_TOKENS)
+    return truncated
+
 
 async def embed_batch(texts: list[str]) -> list[list[float]]:
     """Embed all texts. Auto-detects batch vs legacy API on first call.
@@ -28,6 +46,8 @@ async def embed_batch(texts: list[str]) -> list[list[float]]:
     global _use_batch_api
     if not texts:
         return []
+
+    texts = [_truncate(t) for t in texts]
 
     async with httpx.AsyncClient(timeout=300) as client:
         if _use_batch_api is None:
@@ -100,44 +120,89 @@ async def _probe_batch_api(client: httpx.AsyncClient) -> bool:
 
 
 async def _embed_batch_api(client: httpx.AsyncClient, texts: list[str]) -> list[list[float]]:
-    batches = [texts[i:i + BATCH_SIZE] for i in range(0, len(texts), BATCH_SIZE)]
+    # Filter empty/whitespace texts — Ollama's /api/embed returns 400 on empty strings.
+    # Keep original indices so we can reconstruct the full result list afterwards.
+    indexed = [(i, t) for i, t in enumerate(texts) if t.strip()]
+    if not indexed:
+        return [[] for _ in texts]
+
+    non_empty_indices, non_empty_texts = zip(*indexed)
+
+    batches = [
+        non_empty_texts[i:i + BATCH_SIZE]
+        for i in range(0, len(non_empty_texts), BATCH_SIZE)
+    ]
+    batch_starts = [
+        non_empty_indices[i]
+        for i in range(0, len(non_empty_indices), BATCH_SIZE)
+    ]
     completed = 0
     sem = asyncio.Semaphore(CONCURRENCY)
 
-    async def _one_batch(batch: list[str]) -> list[list[float]]:
+    async def _one_batch(batch: tuple[str, ...]) -> list[list[float]]:
         nonlocal completed
         async with sem:
             resp = await client.post(
                 f"{settings.ollama_base_url}/api/embed",
-                json={"model": settings.ollama_embed_model, "input": batch},
+                json={
+                    "model": settings.ollama_embed_model,
+                    "input": list(batch),
+                    "truncate": True,
+                },
             )
+            if not resp.is_success:
+                logger.error(
+                    "/api/embed returned %d for batch of %d texts: %s",
+                    resp.status_code, len(batch), resp.text[:400],
+                )
             resp.raise_for_status()
             completed += len(batch)
-            pct = int(completed / len(texts) * 100)
-            logger.info("Embedding progress: %d/%d chunks (%d%%)", completed, len(texts), pct)
+            pct = int(completed / len(non_empty_texts) * 100)
+            logger.info("Embedding progress: %d/%d chunks (%d%%)", completed, len(non_empty_texts), pct)
             return resp.json()["embeddings"]
 
-    results = await asyncio.gather(*[_one_batch(b) for b in batches])
-    return [vec for batch in results for vec in batch]
+    batch_results = await asyncio.gather(*[_one_batch(b) for b in batches])
+    flat_vecs = [vec for batch in batch_results for vec in batch]
+
+    # Reconstruct full-length list, leaving zero vectors for filtered positions
+    dim = len(flat_vecs[0]) if flat_vecs else 0
+    output: list[list[float]] = [[0.0] * dim for _ in texts]
+    for out_idx, vec in zip(non_empty_indices, flat_vecs):
+        output[out_idx] = vec
+    return output
 
 
 async def _embed_legacy_api(client: httpx.AsyncClient, texts: list[str]) -> list[list[float]]:
+    indexed = [(i, t) for i, t in enumerate(texts) if t.strip()]
+    if not indexed:
+        return [[] for _ in texts]
+
     completed = 0
     sem = asyncio.Semaphore(8)
 
-    async def _one(text: str, idx: int) -> tuple[int, list[float]]:
+    async def _one(orig_idx: int, text: str) -> tuple[int, list[float]]:
         nonlocal completed
         async with sem:
             resp = await client.post(
                 f"{settings.ollama_base_url}/api/embeddings",
                 json={"model": settings.ollama_embed_model, "prompt": text},
             )
+            if not resp.is_success:
+                logger.error(
+                    "/api/embeddings returned %d for text[%d]: %s",
+                    resp.status_code, orig_idx, resp.text[:400],
+                )
             resp.raise_for_status()
             completed += 1
-            pct = int(completed / len(texts) * 100)
-            logger.info("Embedding progress: %d/%d chunks (%d%%)", completed, len(texts), pct)
-            return idx, resp.json()["embedding"]
+            pct = int(completed / len(indexed) * 100)
+            logger.info("Embedding progress: %d/%d chunks (%d%%)", completed, len(indexed), pct)
+            return orig_idx, resp.json()["embedding"]
 
-    results = await asyncio.gather(*[_one(t, i) for i, t in enumerate(texts)])
-    results.sort(key=lambda x: x[0])
-    return [vec for _, vec in results]
+    pairs = await asyncio.gather(*[_one(i, t) for i, t in indexed])
+    pairs_sorted = sorted(pairs, key=lambda x: x[0])
+
+    dim = len(pairs_sorted[0][1]) if pairs_sorted else 0
+    output: list[list[float]] = [[0.0] * dim for _ in texts]
+    for orig_idx, vec in pairs_sorted:
+        output[orig_idx] = vec
+    return output

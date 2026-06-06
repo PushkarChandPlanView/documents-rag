@@ -216,12 +216,12 @@ async def retrieve(
     significant = [t for t in terms if len(t) > 4]
 
     async with _new_session() as session:
-        # Stage 1 — keyword-first: semantic search filtered to chunks containing
-        # the most significant query terms (ILIKE; add GIN trgm index for scale).
-        chunks: list[RetrievedChunk] = []
+        # Stage 1 — keyword-first: union results for ALL significant terms so that
+        # multi-term queries aren't scored against only the first matching term.
+        # We keep the row with the best (lowest) vector distance per chunk.
+        emb_literal = _embedding_literal(query_embedding)
+        merged_rows: dict[str, dict] = {}
         for term in significant:
-            emb_literal = _embedding_literal(query_embedding)
-
             if document_ids and len(document_ids) == 1:
                 where_clause = (
                     "de.user_id = CAST(:user_id AS uuid) "
@@ -272,14 +272,15 @@ async def retrieve(
                 """),
                 params,
             )
-            rows = [dict(r._mapping) for r in result.fetchall()]
-            if rows:
-                chunks = _rows_to_chunks(rows, terms)
-                logger.info(
-                    "Keyword-first stage matched %d chunks on term=%r",
-                    len(chunks), term,
-                )
-                break
+            for row in [dict(r._mapping) for r in result.fetchall()]:
+                cid = row["chunk_id"]
+                if cid not in merged_rows or row["distance"] < merged_rows[cid]["distance"]:
+                    merged_rows[cid] = row
+
+        chunks: list[RetrievedChunk] = []
+        if merged_rows:
+            chunks = _rows_to_chunks(list(merged_rows.values()), terms)
+            logger.info("Keyword-first stage matched %d chunks across %d terms", len(chunks), len(significant))
 
         # Stage 2 — fallback to pure semantic search
         if not chunks:

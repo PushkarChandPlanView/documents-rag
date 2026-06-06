@@ -140,6 +140,23 @@ async def get_item(db: AsyncSession, item_id: UUID, user_id: UUID) -> Optional[I
     return result.scalar_one_or_none()
 
 
+async def get_documents_by_ids(
+    db: AsyncSession,
+    document_ids: list[UUID],
+    user_id: UUID,
+) -> dict[UUID, ItemModel]:
+    if not document_ids:
+        return {}
+    result = await db.execute(
+        select(ItemModel).where(
+            ItemModel.id.in_(document_ids),
+            ItemModel.user_id == user_id,
+            ItemModel.type == "document",
+        )
+    )
+    return {row.id: row for row in result.scalars().all()}
+
+
 async def get_document_detail(
     db: AsyncSession, item_id: UUID, user_id: UUID
 ) -> Optional[DocumentDetailResponse]:

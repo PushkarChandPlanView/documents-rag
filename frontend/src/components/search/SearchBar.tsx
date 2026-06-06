@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import styled from "styled-components";
 import { searchApi } from "@/api/chat";
-import type { SearchResult } from "@/types";
+import type { DocumentSearchResult } from "@/types";
 
 const SearchForm = styled.form`
   display: flex;
@@ -55,7 +55,7 @@ const ResultCard = styled.div`
 const ResultHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 `;
 
 const ResultFilename = styled.span`
@@ -64,14 +64,15 @@ const ResultFilename = styled.span`
   color: #333;
 `;
 
-const ResultPage = styled.span`
-  font-weight: 400;
-  color: #666;
-`;
-
 const ResultScore = styled.span`
   font-size: 0.75rem;
   color: #888;
+`;
+
+const ResultMeta = styled.div`
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.5rem;
 `;
 
 const ResultText = styled.p`
@@ -83,7 +84,7 @@ const ResultText = styled.p`
 
 export function SearchBar() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<DocumentSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -94,7 +95,7 @@ export function SearchBar() {
     setLoading(true);
     setError(null);
     try {
-      const data = await searchApi.search(query.trim());
+      const data = await searchApi.searchDocuments(query.trim());
       setResults(data.results || []);
       setSearched(true);
     } catch {
@@ -127,15 +128,28 @@ export function SearchBar() {
 
       <ResultsList>
         {results.map((result) => (
-          <ResultCard key={result.chunk_id}>
+          <ResultCard key={result.document_id}>
             <ResultHeader>
               <ResultFilename>
-                {result.filename || `Document ${result.document_id.slice(0, 8)}`}
-                {result.page_number && <ResultPage> — page {result.page_number}</ResultPage>}
+                {result.document_name || `Document ${result.document_id.slice(0, 8)}`}
               </ResultFilename>
               <ResultScore>Score: {(result.score * 100).toFixed(1)}%</ResultScore>
             </ResultHeader>
-            <ResultText>{result.text}</ResultText>
+            <ResultMeta>
+              {result.file_type && <span>{result.file_type}</span>}
+              {result.page_number != null && <span> · page {result.page_number}</span>}
+              {result.file_size_bytes != null && (
+                <span> · {(result.file_size_bytes / 1024).toFixed(0)} KB</span>
+              )}
+              <span> · {new Date(result.updated_at).toLocaleDateString()}</span>
+              {result.status && <span> · {result.status}</span>}
+            </ResultMeta>
+            {result.description && (
+              <ResultText style={{ color: "#666", marginBottom: "0.4rem" }}>
+                {result.description}
+              </ResultText>
+            )}
+            <ResultText>{result.snippet}</ResultText>
           </ResultCard>
         ))}
       </ResultsList>

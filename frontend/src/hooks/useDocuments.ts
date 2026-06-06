@@ -32,9 +32,6 @@ export function useUploadDocument() {
       onProgress?: (p: number) => void;
       folderId?: string;
     }) => documentsApi.upload(file, onProgress, folderId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
-    },
   });
 }
 

@@ -5,6 +5,7 @@ Publishes: embeddings_generated
 Writes to: pgvector (PostgreSQL document_embeddings table)
 """
 import logging
+import os
 from uuid import UUID
 
 import tiktoken
@@ -68,7 +69,8 @@ class EmbeddingConsumer(BaseConsumer):
             doc_row = doc_result.fetchone()
 
         document_name = doc_row.name if doc_row else doc_id
-        file_type = doc_row.mime_type if doc_row else "unknown"
+        _ext = os.path.splitext(document_name)[1].lstrip(".").lower() if doc_row else ""
+        file_type = _ext or (doc_row.mime_type if doc_row else "unknown")
 
         chunk_ids = [str(row.id) for row in rows]
         chunk_texts = [row.text for row in rows]
@@ -81,7 +83,7 @@ class EmbeddingConsumer(BaseConsumer):
         # The prefix anchors each chunk to its document and position, improving
         # retrieval accuracy without polluting the stored document text.
         contextualized = [
-            f"Document: {document_name} ({file_type})\n\nChunk {chunk_indices[i] + 1} of {total_chunks}:\n{chunk_texts[i]}"
+            f"Document: {document_name}\n\nChunk {chunk_indices[i] + 1} of {total_chunks}:\n{chunk_texts[i]}"
             for i in range(total_chunks)
         ]
 

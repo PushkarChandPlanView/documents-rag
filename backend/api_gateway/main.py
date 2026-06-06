@@ -8,7 +8,7 @@ from sqlalchemy import select
 from config import get_settings
 from dependencies import AsyncSessionLocal, engine
 from models.user import User
-from routers import auth, chat, documents, folders, health
+from routers import auth, chat, documents, folders, health, search
 from services import auth_service, kafka_producer, storage_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -70,3 +70,4 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(folders.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(search.router, prefix="/api")

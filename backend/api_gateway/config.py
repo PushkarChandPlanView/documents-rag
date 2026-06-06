@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     rag_service_url: str = "http://rag_service:8001"
     rag_top_k_retrieve: int = 20
     rag_top_k_rerank: int = 5
+    rag_search_top_k: int = 30
 
     # API
     max_upload_size_mb: int = 100

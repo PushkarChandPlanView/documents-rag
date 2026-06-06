@@ -107,6 +107,25 @@ export interface SearchResponse {
   query: string;
 }
 
+export interface DocumentSearchResult {
+  document_id: string;
+  document_name: string;
+  file_type: string;
+  score: number;
+  snippet: string;
+  page_number: number | null;
+  created_at: string;
+  updated_at: string;
+  status: string | null;
+  description: string | null;
+  file_size_bytes: number | null;
+}
+
+export interface DocumentSearchResponse {
+  query: string;
+  results: DocumentSearchResult[];
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

@@ -49,9 +49,14 @@ class WorkerSettings(BaseSettings):
     bedrock_temperature: float = 0.1
     bedrock_max_tokens: int = 512
 
-    # Chunking — units are TOKENS (cl100k_base), not characters
-    chunk_size: int = 512
-    chunk_overlap: int = 64
+    # Chunking — units are TOKENS (cl100k_base), not characters.
+    # mxbai-embed-large has a 512 BERT-token context; at ~1.8× cl100k→BERT ratio
+    # plus ~20 prefix tokens, 256 cl100k chunks fit safely (256×1.8+20 ≈ 480).
+    chunk_size: int = 256
+    chunk_overlap: int = 32
+    # Hard cap applied in the embedder — slightly below chunk_size to leave
+    # room for the "Document: …\n\nChunk N of M:\n" prefix.
+    embed_chunk_max_tokens: int = 240
     semantic_chunk_threshold_chars: int = 50_000  # still chars — document-size gate
 
 
