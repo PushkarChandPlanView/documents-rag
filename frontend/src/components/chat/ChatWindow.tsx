@@ -138,28 +138,88 @@ const SourceChip = styled.span`
   color: #1a73e8;
 `;
 
+const AssistantColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0.4rem;
+`;
+
+const ThinkingBlock = styled.details`
+  width: 90%;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+`;
+
+const ThinkingSummary = styled.summary`
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  &::before {
+    content: "▶";
+    font-size: 0.6rem;
+    transition: transform 0.15s;
+  }
+
+  details[open] > &::before {
+    transform: rotate(90deg);
+  }
+`;
+
+const ThinkingContent = styled.div`
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  color: #777;
+  border-top: 1px solid #e0e0e0;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+`;
+
 function Message({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
   return (
     <MessageRow $isUser={isUser}>
-      <Bubble $isUser={isUser}>
-        {isUser
-          ? <UserText>{msg.content}</UserText>
-          : msg.status && !msg.content
-            ? <StatusText>{msg.status}</StatusText>
-            : <AssistantMarkdown content={msg.content} />
-        }
-        {msg.sources && msg.sources.length > 0 && (
-          <SourcesSection>
-            <SourcesLabel>Sources:</SourcesLabel>
-            {msg.sources.map((s, i) => (
-              <SourceChip key={i}>
-                doc:{s.document_id.slice(0, 8)}{s.page_number ? ` p.${s.page_number}` : ""}
-              </SourceChip>
-            ))}
-          </SourcesSection>
-        )}
-      </Bubble>
+      {isUser ? (
+        <Bubble $isUser>
+          <UserText>{msg.content}</UserText>
+        </Bubble>
+      ) : (
+        <AssistantColumn>
+          {msg.thinking && (
+            <ThinkingBlock>
+              <ThinkingSummary>Thinking…</ThinkingSummary>
+              <ThinkingContent>{msg.thinking}</ThinkingContent>
+            </ThinkingBlock>
+          )}
+          <Bubble $isUser={false}>
+            {msg.status && !msg.content
+              ? <StatusText>{msg.status}</StatusText>
+              : <AssistantMarkdown content={msg.content} />
+            }
+            {msg.sources && msg.sources.length > 0 && (
+              <SourcesSection>
+                <SourcesLabel>Sources:</SourcesLabel>
+                {msg.sources.map((s, i) => (
+                  <SourceChip key={i}>
+                    doc:{s.document_id.slice(0, 8)}{s.page_number ? ` p.${s.page_number}` : ""}
+                  </SourceChip>
+                ))}
+              </SourcesSection>
+            )}
+          </Bubble>
+        </AssistantColumn>
+      )}
     </MessageRow>
   );
 }
@@ -281,6 +341,11 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
+      // Accumulate thinking/answer in plain variables — no React batching issues.
+      // qwen3 emits thinking content (no opening <think> tag) then </think> then answer.
+      let thinkingBuf = "";
+      let thinkingDone = false;
+
       for await (const event of streamChat(userMsg.content, documentId ? [documentId] : undefined)) {
         if (event.type === "status" && event.message) {
           setMessages((prev) => {
@@ -289,25 +354,76 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
             return updated;
           });
         } else if (event.token) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              ...updated[updated.length - 1],
-              status: undefined,
-              content: updated[updated.length - 1].content + event.token,
-            };
-            return updated;
-          });
+          const token = event.token;
+
+          if (!thinkingDone) {
+            thinkingBuf += token;
+            const splitIdx = thinkingBuf.indexOf("</think>");
+
+            if (splitIdx !== -1) {
+              thinkingDone = true;
+              const thinkingText = thinkingBuf.slice(0, splitIdx);
+              const answerText = thinkingBuf.slice(splitIdx + 8).replace(/^\n+/, "");
+              thinkingBuf = "";
+
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  status: undefined,
+                  thinking: thinkingText || undefined,
+                  content: answerText,
+                };
+                return updated;
+              });
+            } else {
+              const snapshot = thinkingBuf;
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  status: undefined,
+                  thinking: snapshot,
+                };
+                return updated;
+              });
+            }
+          } else {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                content: updated[updated.length - 1].content + token,
+              };
+              return updated;
+            });
+          }
         }
-        if (event.done && event.sources && event.sources.length > 0) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              ...updated[updated.length - 1],
-              sources: event.sources,
-            };
-            return updated;
-          });
+        if (event.done) {
+          // If stream ended without a </think> marker, the model either
+          // didn't think or hit the token limit. Show the buffer as content.
+          if (!thinkingDone && thinkingBuf) {
+            const fallback = thinkingBuf;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                thinking: undefined,
+                content: fallback,
+              };
+              return updated;
+            });
+          }
+          if (event.sources && event.sources.length > 0) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                sources: event.sources,
+              };
+              return updated;
+            });
+          }
         }
       }
     } catch {

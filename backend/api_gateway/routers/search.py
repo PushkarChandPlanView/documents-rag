@@ -40,6 +40,10 @@ async def search_documents(
 
     chunks: list[dict] = resp.json().get("results", [])
 
+    # Drop chunks that don't meet the relevance threshold so unrelated
+    # documents are never surfaced in the results.
+    chunks = [c for c in chunks if c.get("score", 0) >= settings.rag_search_min_score]
+
     # Group by document_id, keep highest-score chunk per doc
     best: dict[str, dict] = {}
     for chunk in chunks:

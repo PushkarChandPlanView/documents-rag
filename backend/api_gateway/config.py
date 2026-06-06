@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     rag_top_k_retrieve: int = 20
     rag_top_k_rerank: int = 5
     rag_search_top_k: int = 30
+    rag_search_min_score: float = 0.40
 
     # API
     max_upload_size_mb: int = 100

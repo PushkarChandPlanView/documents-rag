@@ -6,6 +6,14 @@ from fastapi import FastAPI
 from routers import health, query
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+class _NoHealthCheck(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "GET /health" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_NoHealthCheck())
 logger = logging.getLogger(__name__)
 
 

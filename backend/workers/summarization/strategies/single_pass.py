@@ -1,7 +1,8 @@
 """Single-pass summarization for documents ≤ TOKEN_THRESHOLD tokens."""
 from shared.providers import llm_factory
 
-SUMMARIZE_PROMPT = """You are a document summarization assistant.
+SUMMARIZE_PROMPT = """/no_think
+You are a document summarization assistant.
 Provide a clear, concise summary of the following document text.
 Focus on the main topics, key findings, and important details.
 Keep the summary between 3-8 sentences.

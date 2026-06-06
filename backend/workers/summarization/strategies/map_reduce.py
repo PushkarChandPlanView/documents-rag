@@ -12,13 +12,15 @@ CONCURRENCY = 4
 # Sample at most this many chunks evenly from the document — keeps LLM calls bounded
 MAX_MAP_CHUNKS = 30
 
-CHUNK_PROMPT = """Summarize the following text segment in 2-3 sentences:
+CHUNK_PROMPT = """/no_think
+Summarize the following text segment in 2-3 sentences:
 
 {text}
 
 Summary:"""
 
-REDUCE_PROMPT = """You have been given multiple summaries of sections from a document.
+REDUCE_PROMPT = """/no_think
+You have been given multiple summaries of sections from a document.
 Combine them into a single coherent summary of the entire document in 5-8 sentences.
 
 Section summaries:
