@@ -1,5 +1,6 @@
 import { DragEvent, useRef, useState } from "react";
 import styled from "styled-components";
+import { borderRadius, color, spacing, text } from "@planview/pv-utilities";
 import { ButtonPrimary } from "@planview/pv-uikit";
 import { useUploadDocument } from "@/hooks/useDocuments";
 import { useDocumentStatus } from "@/hooks/useWebSocket";
@@ -24,17 +25,17 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.75rem;
-  background: #f5f5f5;
+  padding: ${spacing.xsmall}px ${spacing.small}px;
+  background: ${color.backgroundNeutral50};
   border-radius: 6px 6px 0 0;
-  border: 1px solid #e0e0e0;
+  border: 1px solid ${color.borderLight};
   border-bottom: none;
-  font-size: 0.8rem;
-  color: #555;
+  ${text.small};
+  color: ${color.textSecondary};
 `;
 
 const FileList = styled.div`
-  border: 1px solid #e0e0e0;
+  border: 1px solid ${color.borderLight};
   border-bottom: none;
   flex: 1;
 `;
@@ -42,24 +43,24 @@ const FileList = styled.div`
 const FileRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  gap: ${spacing.small}px;
+  padding: ${spacing.small}px;
+  border-bottom: 1px solid ${color.borderLight};
+  background: ${color.backgroundNeutral0};
 `;
 
 const FileIconBox = styled.div<{ $ext: string }>`
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  ${borderRadius.small()};
   background: ${({ $ext }) =>
-    $ext === "pdf" ? "#e53935" : $ext === "docx" || $ext === "doc" ? "#1565c0" : "#555"};
+    $ext === "pdf" ? "#e53935" : $ext === "docx" || $ext === "doc" ? "#1565c0" : color.textSecondary};
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  ${text.small};
   font-weight: 700;
-  color: #fff;
+  color: ${color.textInverse};
   flex-shrink: 0;
   text-transform: uppercase;
 `;
@@ -70,24 +71,24 @@ const FileInfo = styled.div`
 `;
 
 const FileName = styled.div`
-  font-size: 0.825rem;
+  ${text.regular};
   font-weight: 500;
-  color: #222;
+  color: ${color.textPrimary};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
 const FileStatus = styled.div<{ $error?: boolean }>`
-  font-size: 0.72rem;
-  color: ${({ $error }) => ($error ? "#c62828" : "#555")};
+  ${text.small};
+  color: ${({ $error }) => ($error ? color.textError : color.textSecondary)};
   margin-top: 2px;
 `;
 
 const ProgressBar = styled.div`
   height: 3px;
-  background: #e0e0e0;
-  border-radius: 2px;
+  background: ${color.borderLight};
+  ${borderRadius.small()};
   margin-top: 4px;
   overflow: hidden;
 `;
@@ -95,7 +96,7 @@ const ProgressBar = styled.div`
 const ProgressFill = styled.div<{ $pct: number }>`
   height: 100%;
   width: ${({ $pct }) => $pct}%;
-  background: #1a73e8;
+  background: ${color.backgroundPrimary};
   transition: width 0.2s;
 `;
 
@@ -103,31 +104,30 @@ const IconBtn = styled.button`
   background: none;
   border: none;
   cursor: pointer;
-  color: #777;
+  color: ${color.textSecondary};
   padding: 2px 4px;
   font-size: 1rem;
   line-height: 1;
   flex-shrink: 0;
-  &:hover { color: #333; }
+  &:hover { color: ${color.textPrimary}; }
 `;
 
-// Pipeline expand panel
 const PipelinePanel = styled.div`
-  padding: 0.5rem 0.75rem 0.75rem 3rem;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
+  padding: ${spacing.xsmall}px ${spacing.small}px ${spacing.small}px 3rem;
+  background: ${color.backgroundNeutral50};
+  border-bottom: 1px solid ${color.borderLight};
 `;
 
 const StageList = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: ${spacing.xsmall}px;
   flex-wrap: wrap;
-  margin-top: 0.25rem;
+  margin-top: ${spacing.xsmall}px;
 `;
 
 const StageDot = styled.span<{ $color: string }>`
   color: ${({ $color }) => $color};
-  font-size: 0.72rem;
+  ${text.small};
   font-weight: 600;
 `;
 
@@ -145,15 +145,15 @@ function PipelineRow({ documentId }: { documentId: string }) {
     <PipelinePanel>
       <StageList>
         {stages.map((job) => {
-          const color =
+          const stageColor =
             job.status === "COMPLETED" ? "#2e7d32"
-            : job.status === "FAILED"  ? "#c62828"
-            : job.status === "IN_PROGRESS" ? "#1565c0"
-            : "#9e9e9e";
+            : job.status === "FAILED"  ? color.textError
+            : job.status === "IN_PROGRESS" ? color.backgroundPrimary
+            : color.textSecondary;
           return (
             <span key={job.stage} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <StageDot $color={color}>●</StageDot>
-              <span style={{ fontSize: "0.72rem", color }}>{STAGE_LABELS[job.stage] || job.stage}</span>
+              <StageDot $color={stageColor}>●</StageDot>
+              <span style={{ fontSize: "0.72rem", color: stageColor }}>{STAGE_LABELS[job.stage] || job.stage}</span>
             </span>
           );
         })}
@@ -167,29 +167,28 @@ function PipelineRow({ documentId }: { documentId: string }) {
   );
 }
 
-// Drop zone (shown when no files yet)
 const DropZone = styled.div<{ $dragging: boolean }>`
-  border: 2px dashed ${({ $dragging }) => ($dragging ? "#1a73e8" : "#ccc")};
+  border: 2px dashed ${({ $dragging }) => ($dragging ? color.backgroundPrimary : color.borderLight)};
   border-radius: 8px;
   padding: 3rem 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: ${spacing.xsmall}px;
   cursor: pointer;
-  background: ${({ $dragging }) => ($dragging ? "#e8f0fe" : "#fff")};
+  background: ${({ $dragging }) => ($dragging ? color.primary0 : color.backgroundNeutral0)};
   transition: background 0.15s, border-color 0.15s;
   min-height: 260px;
 `;
 
 const ChooseRow = styled.div`
-  padding: 0.75rem;
+  padding: ${spacing.small}px;
   display: flex;
   justify-content: center;
-  border: 1px solid #e0e0e0;
+  border: 1px solid ${color.borderLight};
   border-radius: 0 0 6px 6px;
-  background: #fafafa;
+  background: ${color.backgroundNeutral50};
 `;
 
 const HiddenInput = styled.input`
@@ -197,11 +196,11 @@ const HiddenInput = styled.input`
 `;
 
 const ErrorBanner = styled.div`
-  font-size: 0.8rem;
-  color: #c62828;
-  padding: 0.25rem 0.75rem;
-  background: #fff3f3;
-  border: 1px solid #e0e0e0;
+  ${text.small};
+  color: ${color.textError};
+  padding: ${spacing.xsmall}px ${spacing.small}px;
+  background: ${color.backgroundError};
+  border: 1px solid ${color.borderLight};
 `;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -280,7 +279,6 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
     setItems((prev) => [...prev, ...newItems]);
     newItems.forEach(startUpload);
 
-    // reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -301,7 +299,6 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
     handleFiles(e.dataTransfer.files);
   };
 
-  // Header stats
   const uploadingCount = items.filter((i) => i.status === "uploading").length;
   const totalBytes = items.reduce((s, i) => s + i.file.size, 0);
   const uploadedBytes = items.reduce((s, i) => {
@@ -319,10 +316,10 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
         onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
       >
-        <span style={{ fontSize: "0.95rem", fontWeight: 500, color: "#333" }}>
+        <span style={{ fontSize: "0.95rem", fontWeight: 500, color: color.textPrimary }}>
           Drag and drop files here
         </span>
-        <span style={{ fontSize: "0.875rem", color: "#888" }}>or</span>
+        <span style={{ fontSize: "0.875rem", color: color.textSecondary }}>or</span>
         <ButtonPrimary onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
           Choose files
         </ButtonPrimary>

@@ -1,84 +1,84 @@
 import { FormEvent, useState } from "react";
 import styled from "styled-components";
+import { borderRadius, color, shadow, spacing, text } from "@planview/pv-utilities";
 import { searchApi } from "@/api/chat";
 import type { DocumentSearchResult } from "@/types";
 
 const SearchForm = styled.form`
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  gap: ${spacing.xsmall}px;
+  margin-bottom: ${spacing.medium}px;
 `;
 
 const SearchInput = styled.input`
   flex: 1;
-  padding: 0.625rem 1rem;
-  border: 1px solid #ccc;
+  padding: ${spacing.small}px ${spacing.medium}px;
+  border: 1px solid ${color.borderLight};
   border-radius: 24px;
-  font-size: 0.9rem;
+  ${text.regular};
   outline: none;
 `;
 
 const SearchButton = styled.button<{ $disabled: boolean }>`
-  padding: 0.625rem 1.25rem;
-  background: #1a73e8;
-  color: #fff;
+  padding: ${spacing.small}px ${spacing.medium}px;
+  background: ${color.backgroundPrimary};
+  color: ${color.textInverse};
   border: none;
   border-radius: 24px;
   cursor: pointer;
-  font-weight: 600;
+  ${text.regularSemibold};
   opacity: ${({ $disabled }) => ($disabled ? 0.5 : 1)};
 `;
 
 const ErrorText = styled.p`
-  color: #d32f2f;
+  color: ${color.textError};
 `;
 
 const NoResults = styled.p`
-  color: #999;
+  color: ${color.textPlaceholder};
   text-align: center;
 `;
 
 const ResultsList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${spacing.small}px;
 `;
 
 const ResultCard = styled.div`
-  background: #fff;
-  border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  border-left: 4px solid #1a73e8;
+  background: ${color.backgroundNeutral0};
+  ${borderRadius.medium()};
+  padding: ${spacing.small}px;
+  ${shadow.small};
+  border-left: 4px solid ${color.backgroundPrimary};
 `;
 
 const ResultHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.25rem;
+  margin-bottom: ${spacing.xsmall}px;
 `;
 
 const ResultFilename = styled.span`
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #333;
+  ${text.regularSemibold};
+  color: ${color.textPrimary};
 `;
 
 const ResultScore = styled.span`
-  font-size: 0.75rem;
-  color: #888;
+  ${text.small};
+  color: ${color.textSecondary};
 `;
 
 const ResultMeta = styled.div`
-  font-size: 0.75rem;
-  color: #888;
-  margin-bottom: 0.5rem;
+  ${text.small};
+  color: ${color.textSecondary};
+  margin-bottom: ${spacing.xsmall}px;
 `;
 
 const ResultText = styled.p`
   margin: 0;
-  font-size: 0.875rem;
-  color: #555;
+  ${text.regular};
+  color: ${color.textSecondary};
   line-height: 1.6;
 `;
 
@@ -145,7 +145,7 @@ export function SearchBar() {
               {result.status && <span> · {result.status}</span>}
             </ResultMeta>
             {result.description && (
-              <ResultText style={{ color: "#666", marginBottom: "0.4rem" }}>
+              <ResultText style={{ color: color.textSecondary, marginBottom: `${spacing.xsmall}px` }}>
                 {result.description}
               </ResultText>
             )}

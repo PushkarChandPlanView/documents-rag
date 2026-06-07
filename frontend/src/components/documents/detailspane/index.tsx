@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
+import { color, spacing, text } from "@planview/pv-utilities";
 import { DetailsPanel, DetailsPanelSection } from "@planview/pv-details";
 import { AiAnvi, Info, Refresh } from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
@@ -29,20 +30,20 @@ function fmtDate(iso: string) {
 const MetaGrid = styled.dl`
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 6px 12px;
-  margin: 0 0 16px;
-  font-size: 0.82rem;
+  gap: ${spacing.xsmall}px ${spacing.small}px;
+  margin: 0 0 ${spacing.medium}px;
+  ${text.small};
 `;
 
 const MetaLabel = styled.dt`
-  color: #666;
+  color: ${color.textSecondary};
   font-weight: 500;
   white-space: nowrap;
 `;
 
 const MetaValue = styled.dd`
   margin: 0;
-  color: #222;
+  color: ${color.textPrimary};
   word-break: break-word;
 `;
 
@@ -149,7 +150,7 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
                           href={doc.source_url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: "#1a73e8", wordBreak: "break-all" }}
+                          style={{ color: color.backgroundPrimary, wordBreak: "break-all" }}
                         >
                           {doc.source_url}
                         </a>

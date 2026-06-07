@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Portal } from "@planview/pv-uikit";
 import styled, { ThemeProvider } from "styled-components";
 import zindex from "@planview/pv-utilities/lib/zindex";
-import { color, shadow, size, spacing } from "@planview/pv-utilities";
+import { borderRadius, color, shadow, size, spacing, text } from "@planview/pv-utilities";
 import { searchApi } from "@/api/chat";
 import type { DocumentSearchResult } from "@/types";
 import LandingPage from "./LandingPage";
@@ -19,6 +19,7 @@ const FILTER_WIDTH = 280;
 
 const Wrapper = styled.div`
   background-color: ${color.gray0};
+  ${text.regular};
   box-sizing: border-box;
   z-index: ${({ theme }) => theme.zindex};
   position: absolute;
@@ -37,22 +38,22 @@ const Wrapper = styled.div`
 const ResultsList = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: ${spacing.xsmall}px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${spacing.xsmall}px;
 `;
 
 const ResultCard = styled.div`
-  padding: 0.75rem;
-  border-radius: 6px;
-  background: #fff;
-  border: 1px solid #e8eaed;
+  padding: ${spacing.small}px;
+  ${borderRadius.medium()};
+  background: ${color.backgroundNeutral0};
+  border: 1px solid ${color.borderLight};
   cursor: pointer;
 
   &:hover {
-    border-color: #1a73e8;
-    background: #f8f9ff;
+    border-color: ${color.backgroundPrimary};
+    background: ${color.primary0};
   }
 `;
 
@@ -60,13 +61,13 @@ const ResultHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 0.2rem;
+  margin-bottom: 2px;
 `;
 
 const ResultName = styled.span`
-  font-size: 0.875rem;
+  ${text.regular};
   font-weight: 600;
-  color: #202124;
+  color: ${color.textPrimary};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -74,21 +75,21 @@ const ResultName = styled.span`
 `;
 
 const ResultScore = styled.span`
-  font-size: 0.7rem;
-  color: #888;
+  ${text.small};
+  color: ${color.textSecondary};
   flex-shrink: 0;
 `;
 
 const ResultMeta = styled.div`
-  font-size: 0.72rem;
-  color: #888;
-  margin-bottom: 0.35rem;
+  ${text.small};
+  color: ${color.textSecondary};
+  margin-bottom: ${spacing.xsmall}px;
 `;
 
 const ResultSnippet = styled.p`
   margin: 0;
-  font-size: 0.8rem;
-  color: #555;
+  ${text.small};
+  color: ${color.textSecondary};
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -101,9 +102,9 @@ const StateMessage = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
-  color: #888;
-  padding: 2rem;
+  ${text.regular};
+  color: ${color.textSecondary};
+  padding: ${spacing.medium}px;
   text-align: center;
 `;
 

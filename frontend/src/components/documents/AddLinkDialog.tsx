@@ -1,25 +1,26 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { Input, Modal, MODAL_MEDIUM } from "@planview/pv-uikit";
+import { color, spacing, text } from "@planview/pv-utilities";
 import { useAddLink } from "@/hooks/useDocuments";
 
 const ErrorText = styled.p`
-  color: #c62828;
-  font-size: 0.75rem;
-  margin: 4px 0 0;
+  ${text.small};
+  color: ${color.textError};
+  margin: ${spacing.xsmall}px 0 0;
 `;
 
 const FieldLabel = styled.label`
   display: block;
-  font-size: 0.875rem;
+  ${text.regular};
   font-weight: 500;
-  margin-bottom: 4px;
+  margin-bottom: ${spacing.xsmall}px;
 `;
 
 const FieldGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: ${spacing.medium}px;
 `;
 
 interface AddLinkDialogProps {

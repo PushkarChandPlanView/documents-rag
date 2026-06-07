@@ -1,12 +1,15 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
+import { color, spacing, text } from "@planview/pv-utilities";
 import { Grid, GridCellBase } from "@planview/pv-grid";
 import type { Column } from "@planview/pv-grid";
 import type { GridRowMeta } from "@planview/pv-grid";
+import { DESTRUCTIVE, Modal } from "@planview/pv-uikit";
 import { ButtonAnviEmptyInverse, ButtonPrimary, ListItem } from "@planview/pv-uikit";
 import {
   AiAnvi,
   FileExcel,
+  FilePdf,
   FilePowerpoint,
   FileText,
   FileWord,
@@ -91,13 +94,14 @@ function getMimeIcon(mime: string): React.ReactNode {
     mime === "application/vnd.ms-powerpoint"
   )
     return <FilePowerpoint />;
+  if (mime === "application/pdf") return <FilePdf />;
   return <FileText />;
 }
 
 const IconWrapper = styled.span`
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: ${spacing.xsmall}px;
   svg {
     width: 16px;
     height: 16px;
@@ -213,12 +217,12 @@ function resolveStatus(doc: DocumentItem): string {
 
 const Badge = styled.span<{ $status: string }>`
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px ${spacing.xsmall}px;
   border-radius: 12px;
-  font-size: 0.7rem;
+  ${text.small};
   font-weight: 600;
-  background: ${({ $status }) => STATUS_COLORS[$status] ?? "#999"};
-  color: #fff;
+  background: ${({ $status }) => STATUS_COLORS[$status] ?? color.textPlaceholder};
+  color: ${color.textInverse};
 `;
 
 const GridWrapper = styled.div`
@@ -229,8 +233,8 @@ const GridWrapper = styled.div`
 `;
 
 const LoadMoreWrapper = styled.div`
-  padding: 8px 16px;
-  border-top: 1px solid #e0e0e0;
+  padding: ${spacing.xsmall}px ${spacing.medium}px;
+  border-top: 1px solid ${color.borderLight};
   display: flex;
   justify-content: center;
 `;
@@ -252,8 +256,10 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
   const { mutate: deleteFolder } = useDeleteFolder();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [initialised, setInitialised] = useState(false);
+  const [folderToBeDeleted, setFolderToBeDeleted] = useState<{ id: string; name: string } | null>(null);
+  const [fileToBeDeleted, setFileToBeDeleted] = useState<{ id: string; name: string } | null>(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
-  // Flatten all pages into a single unified items array
   const allItems = useMemo(() => (data?.pages ?? []).flatMap((p) => p.items), [data?.pages]);
 
   const gridData = useMemo(() => {
@@ -284,7 +290,6 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
     return buildGridData(rows);
   }, [allItems, filters, parentId]);
 
-  // Expand all folder rows on first load (root + nested)
   useMemo(() => {
     if (!initialised && gridData.ids.length) {
       const allFolderIds = new Set([...gridData.data.entries()].filter(([, row]) => !row._doc).map(([id]) => id));
@@ -312,8 +317,11 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
                   <IconWrapper>
                     <Folder />
                     <span
-                      style={{ fontWeight: 600, cursor: "pointer", color: "#1a73e8" }}
-                      onClick={(e) => { e.stopPropagation(); onFolderOpen?.(row!.id); }}
+                      style={{ fontWeight: 600, cursor: "pointer", color: color.backgroundPrimary }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onFolderOpen?.(row!.id);
+                      }}
                     >
                       {value}
                     </span>
@@ -325,7 +333,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
               <GridCellBase tabIndex={tabIndex}>
                 <IconWrapper>
                   {getMimeIcon(row._doc.mime_type ?? "")}
-                  <span style={{ color: row.status === "COMPLETED" ? "#1a73e8" : "inherit" }}>{value}</span>
+                  <span style={{ color: row.status === "COMPLETED" ? color.backgroundPrimary : "inherit" }}>{value}</span>
                 </IconWrapper>
               </GridCellBase>
             );
@@ -415,8 +423,12 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
               icon={<Trash />}
               label="Delete"
               onActivate={() => {
-                if (row._doc) deleteDoc(row._doc.id);
-                else deleteFolder(row.id);
+                if (row._doc) {
+                  setFileToBeDeleted({ id: row._doc.id, name: row._doc.name });
+                } else {
+                  setFolderToBeDeleted({ id: row.id, name: row.name });
+                }
+                setShowConfirmDelete(true);
               }}
             />
           )}
@@ -429,6 +441,22 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           </ButtonPrimary>
         </LoadMoreWrapper>
       )}
+      {showConfirmDelete && (!!folderToBeDeleted || !!fileToBeDeleted) ? (
+        <Modal
+          onConfirm={() => {
+            if (fileToBeDeleted) deleteDoc(fileToBeDeleted.id);
+            if (folderToBeDeleted) deleteFolder(folderToBeDeleted.id);
+            setShowConfirmDelete(false);
+          }}
+          onCancel={() => setShowConfirmDelete(false)}
+          headerText="Confirm Delete"
+          confirmText="Delete"
+          type={DESTRUCTIVE}
+          cancelText="Cancel"
+        >
+          <p>Are you sure you want to delete this {folderToBeDeleted ? "folder" : "file"}?</p>
+        </Modal>
+      ) : null}
     </GridWrapper>
   );
 }

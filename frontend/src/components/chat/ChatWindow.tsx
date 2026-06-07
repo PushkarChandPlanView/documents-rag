@@ -1,230 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { color, spacing, text } from "@planview/pv-utilities";
 import { streamChat } from "@/api/chat";
 import { documentsApi } from "@/api/documents";
 import type { ChatMessage } from "@/types";
-
-// ── Markdown elements ────────────────────────────────────────────────────────
-
-const MdP = styled.p`margin: 0 0 0.5rem;`;
-const MdUl = styled.ul`margin: 0 0 0.5rem; padding-left: 1.25rem;`;
-const MdOl = styled.ol`margin: 0 0 0.5rem; padding-left: 1.25rem;`;
-const MdLi = styled.li`margin-bottom: 0.2rem;`;
-const MdH1 = styled.h1`font-size: 1.1rem; font-weight: 700; margin: 0.75rem 0 0.4rem;`;
-const MdH2 = styled.h2`font-size: 1rem; font-weight: 700; margin: 0.75rem 0 0.4rem;`;
-const MdH3 = styled.h3`font-size: 0.95rem; font-weight: 600; margin: 0.5rem 0 0.25rem;`;
-const MdCode = styled.code`
-  background: #f1f3f4;
-  border-radius: 4px;
-  padding: 0.1em 0.3em;
-  font-size: 0.82rem;
-  font-family: monospace;
-`;
-const MdBlockCode = styled(MdCode)`
-  display: block;
-  background: transparent;
-  padding: 0;
-`;
-const MdPre = styled.pre`
-  background: #f1f3f4;
-  border-radius: 6px;
-  padding: 0.75rem;
-  overflow: auto;
-  margin: 0 0 0.5rem;
-`;
-const MdBlockquote = styled.blockquote`
-  border-left: 3px solid #ccc;
-  padding-left: 0.75rem;
-  color: #666;
-  margin: 0 0 0.5rem;
-`;
-
-function normalizeMarkdown(text: string): string {
-  return text
-    .replace(/^[•●◦◆▪▸]\s+/gm, "- ")   // unicode bullets → markdown list
-    .replace(/^(\s+)[•●◦◆▪▸]\s+/gm, "$1- "); // indented unicode bullets
-}
-
-function AssistantMarkdown({ content }: { content: string }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        p: ({ children }) => <MdP>{children}</MdP>,
-        ul: ({ children }) => <MdUl>{children}</MdUl>,
-        ol: ({ children }) => <MdOl>{children}</MdOl>,
-        li: ({ children }) => <MdLi>{children}</MdLi>,
-        h1: ({ children }) => <MdH1>{children}</MdH1>,
-        h2: ({ children }) => <MdH2>{children}</MdH2>,
-        h3: ({ children }) => <MdH3>{children}</MdH3>,
-        code: ({ children, className }) => {
-          const isBlock = !!className;
-          return isBlock
-            ? <MdBlockCode>{children}</MdBlockCode>
-            : <MdCode>{children}</MdCode>;
-        },
-        pre: ({ children }) => <MdPre>{children}</MdPre>,
-        blockquote: ({ children }) => <MdBlockquote>{children}</MdBlockquote>,
-      }}
-    >
-      {normalizeMarkdown(content)}
-    </ReactMarkdown>
-  );
-}
-
-// ── Message ──────────────────────────────────────────────────────────────────
-
-const MessageRow = styled.div<{ $isUser: boolean }>`
-  display: flex;
-  justify-content: ${({ $isUser }) => ($isUser ? "flex-end" : "flex-start")};
-  margin-bottom: 1rem;
-`;
-
-const Bubble = styled.div<{ $isUser: boolean }>`
-  max-width: 75%;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: ${({ $isUser }) => ($isUser ? "#1a73e8" : "#fff")};
-  color: ${({ $isUser }) => ($isUser ? "#fff" : "#333")};
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  font-size: 0.9rem;
-  line-height: 1.6;
-`;
-
-const UserText = styled.p`margin: 0; white-space: pre-wrap;`;
-
-const StatusText = styled.p`
-  margin: 0;
-  color: #888;
-  font-size: 0.85rem;
-  font-style: italic;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &::after {
-    content: "";
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #888;
-    animation: pulse 1s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-  }
-`;
-
-const SourcesSection = styled.div`
-  margin-top: 0.5rem;
-  border-top: 1px solid #e0e0e0;
-  padding-top: 0.5rem;
-`;
-
-const SourcesLabel = styled.p`margin: 0 0 0.25rem; font-size: 0.7rem; color: #666;`;
-
-const SourceChip = styled.span`
-  display: inline-block;
-  margin: 2px;
-  padding: 2px 6px;
-  background: #f0f4ff;
-  border-radius: 10px;
-  font-size: 0.65rem;
-  color: #1a73e8;
-`;
-
-const AssistantColumn = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  gap: 0.4rem;
-`;
-
-const ThinkingBlock = styled.details`
-  width: 90%;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #fafafa;
-`;
-
-const ThinkingSummary = styled.summary`
-  padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
-  color: #888;
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-
-  &::before {
-    content: "▶";
-    font-size: 0.6rem;
-    transition: transform 0.15s;
-  }
-
-  details[open] > &::before {
-    transform: rotate(90deg);
-  }
-`;
-
-const ThinkingContent = styled.div`
-  padding: 0.5rem 0.75rem;
-  font-size: 0.78rem;
-  color: #777;
-  border-top: 1px solid #e0e0e0;
-  white-space: pre-wrap;
-  max-height: 220px;
-  overflow-y: auto;
-`;
-
-function Message({ msg }: { msg: ChatMessage }) {
-  const isUser = msg.role === "user";
-  return (
-    <MessageRow $isUser={isUser}>
-      {isUser ? (
-        <Bubble $isUser>
-          <UserText>{msg.content}</UserText>
-        </Bubble>
-      ) : (
-        <AssistantColumn>
-          {msg.thinking && (
-            <ThinkingBlock>
-              <ThinkingSummary>Thinking…</ThinkingSummary>
-              <ThinkingContent>{msg.thinking}</ThinkingContent>
-            </ThinkingBlock>
-          )}
-          <Bubble $isUser={false}>
-            {msg.status && !msg.content
-              ? <StatusText>{msg.status}</StatusText>
-              : <AssistantMarkdown content={msg.content} />
-            }
-            {msg.sources && msg.sources.length > 0 && (
-              <SourcesSection>
-                <SourcesLabel>Sources:</SourcesLabel>
-                {msg.sources.map((s, i) => (
-                  <SourceChip key={i}>
-                    doc:{s.document_id.slice(0, 8)}{s.page_number ? ` p.${s.page_number}` : ""}
-                  </SourceChip>
-                ))}
-              </SourcesSection>
-            )}
-          </Bubble>
-        </AssistantColumn>
-      )}
-    </MessageRow>
-  );
-}
-
-// ── ChatWindow ───────────────────────────────────────────────────────────────
+import { Message } from "./Message";
+import { ChatInput } from "./ChatInput";
 
 const WindowWrapper = styled.div`
   display: flex;
@@ -235,47 +16,19 @@ const WindowWrapper = styled.div`
 const MessageList = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: ${spacing.small}px;
 `;
 
 const EmptyHint = styled.p`
   text-align: center;
-  color: #999;
-  margin-top: 4rem;
+  color: ${color.textPlaceholder};
+  margin-top: ${spacing.large}px;
 `;
 
 const StreamingIndicator = styled.div`
   text-align: center;
-  color: #999;
-  font-size: 0.8rem;
-`;
-
-const InputForm = styled.form`
-  display: flex;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-top: 1px solid #e0e0e0;
-  background: #fff;
-`;
-
-const TextInput = styled.input`
-  flex: 1;
-  padding: 0.625rem 1rem;
-  border: 1px solid #ccc;
-  border-radius: 24px;
-  font-size: 0.9rem;
-  outline: none;
-`;
-
-const SendButton = styled.button<{ $disabled: boolean }>`
-  padding: 0.625rem 1.25rem;
-  background: #1a73e8;
-  color: #fff;
-  border: none;
-  border-radius: 24px;
-  cursor: pointer;
-  font-weight: 600;
-  opacity: ${({ $disabled }) => ($disabled ? 0.5 : 1)};
+  color: ${color.textPlaceholder};
+  ${text.small};
 `;
 
 interface ChatWindowProps {
@@ -289,7 +42,6 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // When the selected document changes, reset chat and show its summary
   useEffect(() => {
     setMessages([]);
     setInput("");
@@ -440,8 +192,6 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
     }
   };
 
-  const isDisabled = !input.trim() || streaming;
-
   return (
     <WindowWrapper>
       <MessageList>
@@ -456,17 +206,12 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
         {streaming && <StreamingIndicator>Generating response...</StreamingIndicator>}
         <div ref={bottomRef} />
       </MessageList>
-      <InputForm onSubmit={handleSubmit}>
-        <TextInput
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question about your documents..."
-          disabled={streaming}
-        />
-        <SendButton type="submit" disabled={isDisabled} $disabled={isDisabled}>
-          Send
-        </SendButton>
-      </InputForm>
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSubmit={handleSubmit}
+        streaming={streaming}
+      />
     </WindowWrapper>
   );
 }

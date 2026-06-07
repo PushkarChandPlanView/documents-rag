@@ -1,12 +1,12 @@
 import React from "react";
 import styled from "styled-components";
+import { color } from "@planview/pv-utilities";
 import AppNavigationBar from "./AppNavigationBar";
 
 const Wrapper = styled.div`
   display: flex;
   width: 100%;
   height: 100%;
-  font-family: system-ui, sans-serif;
   position: relative;
   flex-direction: column;
 `;
@@ -14,7 +14,7 @@ const Wrapper = styled.div`
 const Main = styled.main`
   height: 100%;
   width: 100%;
-  background: #f8f9fa;
+  background: ${color.backgroundNeutral50};
   box-sizing: border-box;
 `;
 

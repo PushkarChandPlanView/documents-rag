@@ -1,28 +1,29 @@
 import styled from "styled-components";
+import { color, spacing, text } from "@planview/pv-utilities";
 import SearchLanding from "../../../assets/images/search-landing-slate.svg";
 import SearchTip from "../../../assets/images/search-tips-lightbulb.svg";
 
 type Props = {};
+
 const Landing = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: ${spacing.large}px;
 `;
 
 const Title = styled.div`
   font-weight: 600;
-  color: #202124;
-  margin-bottom: 1rem;
+  color: ${color.textPrimary};
+  margin-bottom: ${spacing.small}px;
 `;
 
 const Tips = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${spacing.xsmall}px;
 `;
 
 const TipImage = styled.img`
@@ -33,18 +34,18 @@ const TipImage = styled.img`
 const TipContainer = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: ${spacing.xsmall}px;
   flex-direction: column;
 `;
 
 const TipTitle = styled.div`
   font-weight: 500;
-  color: #202124;
+  color: ${color.textPrimary};
 `;
 
 const Tip = styled.div`
-  font-size: 0.8rem;
-  color: #555;
+  ${text.small};
+  color: ${color.textSecondary};
 `;
 
 const LandingPage = (_props: Props) => {

@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "styled-components";
+import { color, spacing, text, borderRadius } from "@planview/pv-utilities";
 import {
   Toolbar,
   ToolbarButtonEmpty,
@@ -44,34 +45,34 @@ const BreadcrumbPath = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  font-size: 0.8rem;
+  ${text.small};
   margin-left: 2px;
 `;
 
 const Sep = styled.span`
   display: inline-flex;
   align-items: center;
-  color: #bbb;
+  color: ${color.textPlaceholder};
   svg { width: 12px; height: 12px; }
 `;
 
 const PathLink = styled.button`
   border: none;
   background: none;
-  padding: 3px 5px;
-  border-radius: 4px;
+  padding: 3px ${spacing.xsmall}px;
+  ${borderRadius.small()};
   cursor: pointer;
-  color: #1a73e8;
-  font-size: 0.8rem;
+  color: ${color.backgroundPrimary};
+  ${text.small};
   line-height: 1;
   &:hover { background: rgba(0,0,0,0.05); text-decoration: underline; }
 `;
 
 const PathCurrent = styled.span`
-  padding: 3px 5px;
+  padding: 3px ${spacing.xsmall}px;
   font-weight: 600;
-  font-size: 0.8rem;
-  color: #222;
+  ${text.small};
+  color: ${color.textPrimary};
 `;
 
 export function ItemToolbar({
@@ -82,7 +83,6 @@ export function ItemToolbar({
   breadcrumb,
   onBreadcrumbNavigate,
 }: ItemToolbarProps) {
-  // Last 2 levels shown inline; everything before that goes into the dropdown
   const visibleCrumbs = breadcrumb ? breadcrumb.slice(-2) : [];
   const hiddenCrumbs  = breadcrumb ? breadcrumb.slice(0, -2) : [];
   const hasBreadcrumb = breadcrumb && onBreadcrumbNavigate;
