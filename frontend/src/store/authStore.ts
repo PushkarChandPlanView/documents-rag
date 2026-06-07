@@ -1,11 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
+}
+
 interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   userEmail: string | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   setTokens: (access: string, refresh: string, email?: string) => void;
   logout: () => void;
 }
@@ -17,14 +27,18 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       userEmail: null,
       isAuthenticated: false,
+      isAdmin: false,
 
-      setTokens: (access, refresh, email) =>
+      setTokens: (access, refresh, email) => {
+        const payload = decodeJwtPayload(access);
         set({
           accessToken: access,
           refreshToken: refresh,
           userEmail: email ?? null,
           isAuthenticated: true,
-        }),
+          isAdmin: Boolean(payload.is_admin),
+        });
+      },
 
       logout: () =>
         set({
@@ -32,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           userEmail: null,
           isAuthenticated: false,
+          isAdmin: false,
         }),
     }),
     {

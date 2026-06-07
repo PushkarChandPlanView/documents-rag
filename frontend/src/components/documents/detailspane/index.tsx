@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { DetailsPanel, DetailsPanelSection } from "@planview/pv-details";
-import { AiAnvi, Info, Refresh } from "@planview/pv-icons";
+import { AiAnvi, CheckmarkCircle, Info, Refresh } from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import { ComplianceTab } from "@/components/compliance/ComplianceTab";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { useReprocessDocument } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
@@ -58,7 +59,7 @@ const ChatFill = styled.div`
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export type DetailTab = "details" | "chat";
+export type DetailTab = "details" | "chat" | "compliance";
 
 interface ItemDetailsPaneProps {
   item: UnifiedItem;
@@ -83,6 +84,7 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
   const tabs = [
     { id: "details", label: "Details", icon: <Info /> },
     ...(canChat ? [{ id: "chat", label: "Chat", icon: <AiAnvi color="anvi" /> }] : []),
+    ...(canChat ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle /> }] : []),
   ];
 
   return (
@@ -173,6 +175,12 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
       {activeTab === "chat" && canChat && (
         <ChatFill>
           <ChatWindow documentId={doc!.id} documentName={doc!.name} />
+        </ChatFill>
+      )}
+
+      {activeTab === "compliance" && canChat && (
+        <ChatFill>
+          <ComplianceTab documentId={doc!.id} />
         </ChatFill>
       )}
     </DetailsPanel>

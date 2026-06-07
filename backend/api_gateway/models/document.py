@@ -65,6 +65,10 @@ class Document(Base):
         "DocumentSummary", back_populates="document", cascade="all, delete-orphan",
         order_by="DocumentSummary.created_at.desc()",
     )
+    compliance_reports: Mapped[list["ComplianceReport"]] = relationship(  # type: ignore[name-defined]
+        "ComplianceReport", cascade="all, delete-orphan",
+        foreign_keys="ComplianceReport.document_id",
+    )
 
 
 class DocumentChunk(Base):

@@ -39,6 +39,17 @@ class LinkAddedEvent(BaseModel):
         return self.model_dump_json().encode("utf-8")
 
 
+class SummaryGeneratedEvent(BaseModel):
+    document_id: UUID
+    user_id: UUID
+    summary_length: int = 0
+    strategy: str = "rescan"
+
+    def to_json(self) -> bytes:
+        return self.model_dump_json().encode("utf-8")
+
+
 class Topics:
     DOCUMENT_UPLOADED = "document_uploaded"
+    SUMMARY_GENERATED = "summary_generated"
     DLQ = "dlq.document_errors"

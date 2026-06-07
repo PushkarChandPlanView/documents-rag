@@ -33,6 +33,7 @@ class Item(BaseModel):
     status: Optional[str] = None
     source_url: Optional[str] = None
     processing_jobs: list[ProcessingJobResponse] = []
+    compliance_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

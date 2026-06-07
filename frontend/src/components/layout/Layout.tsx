@@ -12,8 +12,10 @@ const Wrapper = styled.div`
 `;
 
 const Main = styled.main`
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
   background: ${color.backgroundNeutral50};
   box-sizing: border-box;
 `;

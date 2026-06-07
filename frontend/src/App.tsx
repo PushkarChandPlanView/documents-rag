@@ -9,7 +9,9 @@ import detailsMessages from "@planview/pv-details/lang/en.json";
 import { queryClient } from "@/store/queryClient";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import Login from "@/pages/Login";
+import Overview from "@/pages/Overview";
 import Documents from "@/pages/Documents";
+import { Compliance } from "@/pages/Compliance";
 import { SearchBar } from "./components/search/SearchBar";
 
 export default function App() {
@@ -20,9 +22,11 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Documents />} />
+            <Route path="/" element={<Overview />} />
+            <Route path="/documents" element={<Documents />} />
             <Route path="/search" element={<SearchBar />} />
             <Route path="/folders/:folderId" element={<Documents />} />
+            <Route path="/compliance" element={<Compliance />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

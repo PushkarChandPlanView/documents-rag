@@ -318,6 +318,30 @@ services:
           cpus: "1.0"
           memory: 1G
 
+  worker_compliance:
+    build:
+      context: ./backend/workers
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    <<: *common-env
+    environment:
+      <<: *aws-env
+      WORKER_TYPE: compliance
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [internal]
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
   rag_service:
     build:
       context: ./backend/rag_service

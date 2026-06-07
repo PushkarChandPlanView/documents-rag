@@ -30,6 +30,7 @@ export interface Item {
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | null;
   source_url: string | null;
   processing_jobs: ProcessingJob[];
+  compliance_status: "COMPLIANT" | "WARNING" | "NON_COMPLIANT" | "UNCHECKED" | null;
   created_at: string;
   updated_at: string;
 }

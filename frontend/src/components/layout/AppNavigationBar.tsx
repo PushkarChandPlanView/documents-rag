@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import styled from "styled-components";
 import {
   NavigationBar,
   SearchInput,
@@ -13,8 +14,16 @@ import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import SearchPanel from "../documents/search/SearchPanel";
 
+const NavButton = styled(ToolbarButtonEmptyInverse)<{ $active: boolean }>`
+  border-bottom: 2px solid ${({ $active }) => ($active ? "rgba(255,255,255,0.9)" : "transparent")};
+  border-radius: 0;
+  font-weight: ${({ $active }) => ($active ? "700" : "400")};
+  opacity: ${({ $active }) => ($active ? "1" : "0.8")};
+`;
+
 export default function AppNavigationBar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuthStore();
   const [searchActive, setSearchActive] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -23,12 +32,16 @@ export default function AppNavigationBar() {
     navigate("/login");
   };
 
+  const isActive = (path: string) =>
+    path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+
   return (
     <>
       <NavigationBar aria-label="Main navigation" logo={<LogoProjectplace title="Planview Advisor" />}>
         <ToolbarSectionLeft>
-          <ToolbarButtonEmptyInverse onClick={() => navigate("/")}>Overview</ToolbarButtonEmptyInverse>
-          <ToolbarButtonEmptyInverse onClick={() => navigate("/documents")}>Documents</ToolbarButtonEmptyInverse>
+          <NavButton $active={isActive("/")} onClick={() => navigate("/")}>Overview</NavButton>
+          <NavButton $active={location.pathname.startsWith("/documents") || location.pathname.startsWith("/folders")} onClick={() => navigate("/documents")}>Documents</NavButton>
+          <NavButton $active={isActive("/compliance")} onClick={() => navigate("/compliance")}>Compliance</NavButton>
         </ToolbarSectionLeft>
         <ToolbarSectionRight moreMenuLabel="More actions">
           <SearchInput

@@ -4,7 +4,7 @@ import { color, spacing, text } from "@planview/pv-utilities";
 import { Grid, GridCellBase } from "@planview/pv-grid";
 import type { Column } from "@planview/pv-grid";
 import type { GridRowMeta } from "@planview/pv-grid";
-import { DESTRUCTIVE, Modal } from "@planview/pv-uikit";
+import { Chip, DESTRUCTIVE, Modal } from "@planview/pv-uikit";
 import { ButtonAnviEmptyInverse, ButtonPrimary, ListItem } from "@planview/pv-uikit";
 import {
   AiAnvi,
@@ -19,6 +19,8 @@ import {
 } from "@planview/pv-icons";
 import { useDeleteDocument, useDeleteFolder, useDocuments } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
+import type { ComplianceStatus } from "@/types/compliance";
+import { ComplianceBadge } from "@/components/compliance/ComplianceBadge";
 import type { ItemFiltersState } from "./ItemFilters";
 
 // ── Row model ─────────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ type DocRow = {
   fileType: string;
   size: string;
   status: string;
+  complianceStatus: ComplianceStatus | null;
   uploadedAt: string;
   _doc?: DocumentItem;
   _folder?: FolderItem;
@@ -125,6 +128,7 @@ function unifiedToRows(items: UnifiedItem[], rootFolderId?: string): DocRow[] {
         fileType: "",
         size: "",
         status: "",
+        complianceStatus: null,
         uploadedAt: new Date(item.created_at).toLocaleDateString(),
         _folder: item,
       });
@@ -147,6 +151,7 @@ function unifiedToRows(items: UnifiedItem[], rootFolderId?: string): DocRow[] {
         fileType: getMimeLabel(item.mime_type ?? ""),
         size: formatBytes(item.file_size_bytes ?? 0),
         status: resolveStatus(item),
+        complianceStatus: item.compliance_status ?? null,
         uploadedAt: new Date(item.created_at).toLocaleDateString(),
         _doc: item,
       });
@@ -190,14 +195,14 @@ function buildGridData(rows: DocRow[]) {
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: "#757575",
-  PROCESSING: "#1565c0",
-  TEXT_EXTRACTION: "#1565c0",
-  CHUNKING: "#1565c0",
-  EMBEDDING: "#6a1a9a",
-  SUMMARIZATION: "#e65100",
-  COMPLETED: "#2e7d32",
-  FAILED: "#c62828",
+  PENDING: color.gray100,
+  PROCESSING: color.blue400,
+  TEXT_EXTRACTION: color.blue400,
+  CHUNKING: color.blue400,
+  EMBEDDING: color.purple400,
+  SUMMARIZATION: color.orange400,
+  COMPLETED: color.green400,
+  FAILED: color.red400,
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -215,15 +220,6 @@ function resolveStatus(doc: DocumentItem): string {
   return doc.status ?? "PENDING";
 }
 
-const Badge = styled.span<{ $status: string }>`
-  display: inline-block;
-  padding: 2px ${spacing.xsmall}px;
-  border-radius: 12px;
-  ${text.small};
-  font-weight: 600;
-  background: ${({ $status }) => STATUS_COLORS[$status] ?? color.textPlaceholder};
-  color: ${color.textInverse};
-`;
 
 const GridWrapper = styled.div`
   width: 100%;
@@ -333,7 +329,9 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
               <GridCellBase tabIndex={tabIndex}>
                 <IconWrapper>
                   {getMimeIcon(row._doc.mime_type ?? "")}
-                  <span style={{ color: row.status === "COMPLETED" ? color.backgroundPrimary : "inherit" }}>{value}</span>
+                  <span style={{ color: row.status === "COMPLETED" ? color.backgroundPrimary : "inherit" }}>
+                    {value}
+                  </span>
                 </IconWrapper>
               </GridCellBase>
             );
@@ -358,11 +356,27 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           Renderer: ({ value, tabIndex }) =>
             value ? (
               <GridCellBase tabIndex={tabIndex}>
-                <Badge $status={value}>{value}</Badge>
+                <Chip label={value.toUpperCase()} color={STATUS_COLORS[value]} disabled/>
               </GridCellBase>
             ) : (
               <></>
             ),
+        },
+      },
+      {
+        id: "complianceStatus",
+        label: "Compliance",
+        width: 130,
+        cell: {
+          Renderer: ({ rowId, tabIndex }) => {
+            const row = gridData.data.get(String(rowId));
+            if (!row?._doc || !row.complianceStatus) return <></>;
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                <ComplianceBadge status={row.complianceStatus} />
+              </GridCellBase>
+            );
+          },
         },
       },
       {

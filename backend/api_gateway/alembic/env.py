@@ -11,6 +11,7 @@ from models.base import Base
 import models.user  # noqa
 import models.document  # noqa
 import models.processing_job  # noqa
+import models.compliance  # noqa
 
 config = context.config
 settings = get_settings()

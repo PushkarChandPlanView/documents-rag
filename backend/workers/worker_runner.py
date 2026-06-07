@@ -16,6 +16,7 @@ WORKER_MAP = {
     "chunking": "chunking.consumer.ChunkingConsumer",
     "embedding": "embedding.consumer.EmbeddingConsumer",
     "summarization": "summarization.consumer.SummarizationConsumer",
+    "compliance": "compliance.consumer.ComplianceConsumer",
 }
 
 

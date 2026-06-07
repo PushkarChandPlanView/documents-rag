@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -20,7 +20,7 @@ from schemas.document import (
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _to_item(item: ItemModel) -> Item:
+def _to_item(item: ItemModel, compliance_status: Optional[str] = None) -> Item:
     return Item(
         type=item.type,
         id=item.id,
@@ -33,9 +33,23 @@ def _to_item(item: ItemModel) -> Item:
         status=item.status,
         source_url=item.source_url,
         processing_jobs=[ProcessingJobResponse.model_validate(j) for j in item.processing_jobs],
+        compliance_status=compliance_status,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
+
+
+async def _fetch_compliance_statuses(db: AsyncSession, document_ids: list[UUID]) -> dict[UUID, str]:
+    """Batch-fetch compliance statuses for a list of document IDs."""
+    if not document_ids:
+        return {}
+    rows = (await db.execute(
+        sql_text(
+            "SELECT document_id, status FROM compliance_reports "
+            "WHERE is_current = true AND document_id = ANY(:ids)"
+        ).bindparams(ids=document_ids)
+    )).fetchall()
+    return {row.document_id: row.status for row in rows}
 
 
 # backward compat
@@ -248,10 +262,9 @@ async def list_unified(
             .order_by(ItemModel.created_at.desc(), ItemModel.id.desc())
         )
         rows = list((await db.execute(stmt)).scalars().all())
-        unified = [
-            _to_item(item)
-            for item in rows
-        ]
+        doc_ids = [r.id for r in rows if r.type == "document"]
+        compliance_map = await _fetch_compliance_statuses(db, doc_ids)
+        unified = [_to_item(item, compliance_map.get(item.id)) for item in rows]
         return UnifiedListResponse(items=unified, next_cursor=None, has_more=False)
 
     stmt = (
@@ -273,10 +286,9 @@ async def list_unified(
     has_more = len(rows) > limit
     page = rows[:limit]
     next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
-    unified = [
-        _to_item(item)
-        for item in page
-    ]
+    doc_ids = [r.id for r in page if r.type == "document"]
+    compliance_map = await _fetch_compliance_statuses(db, doc_ids)
+    unified = [_to_item(item, compliance_map.get(item.id)) for item in page]
     return UnifiedListResponse(items=unified, next_cursor=next_cursor, has_more=has_more)
 
 

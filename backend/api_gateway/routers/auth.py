@@ -34,7 +34,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    access_token = create_access_token(user.id, user.email)
+    access_token = create_access_token(user.id, user.email, is_admin=user.is_admin)
     refresh_token = create_refresh_token(user.id)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
@@ -48,7 +48,7 @@ async def refresh(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
         user = await get_user_by_id(db, payload["sub"])
         if not user or not user.is_active:
             raise HTTPException(status_code=401, detail="User not found")
-        access_token = create_access_token(user.id, user.email)
+        access_token = create_access_token(user.id, user.email, is_admin=user.is_admin)
         new_refresh = create_refresh_token(user.id)
         return TokenResponse(access_token=access_token, refresh_token=new_refresh)
     except JWTError:
