@@ -1,12 +1,13 @@
 import styled from "styled-components";
 import type { ComplianceStatus } from "@/types/compliance";
+import { color } from "@planview/pv-utilities";
 
 const COLOR_MAP: Record<ComplianceStatus, { bg: string; text: string }> = {
-  COMPLIANT: { bg: "#e8f5e9", text: "#2e7d32" },
-  WARNING:   { bg: "#ffdcb9", text: "#bf360c" },
-  NON_COMPLIANT: { bg: "#fccfcf", text: "#b71c1c" },
-  UNCHECKED: { bg: "#f5f5f5", text: "#757575" },
-  SCANNING:  { bg: "#e3f2fd", text: "#1565c0" },
+  COMPLIANT: { bg: color.success100, text: color.success400 },
+  WARNING: { bg: color.warning100, text: color.warning400 },
+  NON_COMPLIANT: { bg: color.error100, text: color.error400 },
+  UNCHECKED: { bg: color.gray100, text: color.gray400 },
+  SCANNING: { bg: color.info100, text: color.info400 },
 };
 
 const LABEL_MAP: Record<ComplianceStatus, string> = {
@@ -28,6 +29,7 @@ const Badge = styled.span<{ $status: ComplianceStatus }>`
   white-space: nowrap;
   background: ${({ $status }) => COLOR_MAP[$status].bg};
   color: ${({ $status }) => COLOR_MAP[$status].text};
+  width: fit-content;
 `;
 
 const Dot = styled.span<{ $status: ComplianceStatus }>`

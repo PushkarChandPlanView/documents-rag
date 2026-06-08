@@ -193,7 +193,9 @@ async def get_document_detail(
 
     return DocumentDetailResponse(
         id=item.id,
+        name=item.name,
         filename=item.name,
+        description=item.description,
         mime_type=item.mime_type or "",
         file_size_bytes=item.file_size_bytes or 0,
         status=item.status or "PENDING",

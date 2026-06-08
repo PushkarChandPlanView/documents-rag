@@ -25,8 +25,21 @@ const RULE_TYPE_OPTIONS: ComboboxOption[] = [
 ];
 
 const SEVERITY_OPTIONS: ComboboxOption[] = [
-  { value: "warning", label: "Warning" },
-  { value: "critical", label: "Critical" },
+  { value: "info",     label: "Info — informational, no action required" },
+  { value: "warning",  label: "Warning — should be addressed" },
+  { value: "high",     label: "High — significant concern, needs remediation" },
+  { value: "critical", label: "Critical — legal / security / privacy risk" },
+];
+
+const LLM_CONTENT_OPTIONS: ComboboxOption[] = [
+  {
+    value: "summary",
+    label: "Document Summary — faster, good for tone and quality checks",
+  },
+  {
+    value: "chunks",
+    label: "Full Document Text — slower, needed for offensive language or duplicate detection",
+  },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -56,6 +69,9 @@ export function RuleFormDialog({ rule, onClose }: Props) {
   const [policy, setPolicy] = useState(
     (rule?.params as { policy?: string })?.policy ?? ""
   );
+  const [llmContent, setLlmContent] = useState<"summary" | "chunks">(
+    (rule?.params as { content?: "summary" | "chunks" })?.content ?? "summary"
+  );
 
   function buildParams(): Record<string, unknown> {
     if (ruleType === "keyword_required" || ruleType === "keyword_forbidden") {
@@ -64,7 +80,7 @@ export function RuleFormDialog({ rule, onClose }: Props) {
     if (ruleType === "age_limit_days") {
       return { days };
     }
-    return { policy };
+    return { policy, content: llmContent };
   }
 
   function handleSubmit(_e: React.FormEvent<HTMLFormElement>) {
@@ -177,19 +193,29 @@ export function RuleFormDialog({ rule, onClose }: Props) {
           </Field>
         )}
 
-        {/* LLM policy (llm_check) */}
+        {/* LLM policy + content source (llm_check) */}
         {ruleType === "llm_check" && (
-          <Field id="rule-policy" label="Policy (plain English)">
-            {(fieldProps) => (
-              <Textarea
-                {...fieldProps}
-                value={policy}
-                placeholder="Describe the compliance requirement in plain English…"
-                onChange={(val: string) => setPolicy(val)}
-                nativeProps={{ rows: 4 }}
-              />
-            )}
-          </Field>
+          <>
+            <Field id="rule-policy" label="Policy (plain English)">
+              {(fieldProps) => (
+                <Textarea
+                  {...fieldProps}
+                  value={policy}
+                  placeholder="Describe the compliance requirement in plain English…"
+                  onChange={(val: string) => setPolicy(val)}
+                  nativeProps={{ rows: 4 }}
+                />
+              )}
+            </Field>
+            <Combobox
+              id="rule-llm-content"
+              label="Evaluate against"
+              clearable={false}
+              options={LLM_CONTENT_OPTIONS}
+              value={LLM_CONTENT_OPTIONS.find((o) => o.value === llmContent) ?? LLM_CONTENT_OPTIONS[0]}
+              onChange={(option) => option && setLlmContent(option.value as "summary" | "chunks")}
+            />
+          </>
         )}
 
       </FieldsContainer>

@@ -15,7 +15,7 @@ from base.base_producer import publish
 from config import get_settings
 from shared import db_client, minio_client
 from shared.schemas import DocumentUploadedEvent, TextExtractedEvent, Topics
-from .extractors import docx_extractor, pdf_extractor, pptx_extractor, txt_extractor, url_extractor, xlsx_extractor
+from .extractors import docx_extractor, image_extractor, pdf_extractor, pptx_extractor, txt_extractor, url_extractor, xlsx_extractor
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -31,6 +31,14 @@ MIME_EXTRACTOR_MAP = {
     "application/vnd.ms-excel": xlsx_extractor.extract,
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": pptx_extractor.extract,
     "application/vnd.ms-powerpoint": pptx_extractor.extract,
+    # Images — OCR via Tesseract
+    "image/jpeg":                    image_extractor.extract,
+    "image/jpg":                     image_extractor.extract,
+    "image/png":                     image_extractor.extract,
+    "image/tiff":                    image_extractor.extract,
+    "image/bmp":                     image_extractor.extract,
+    "image/webp":                    image_extractor.extract,
+    "image/gif":                     image_extractor.extract,
 }
 
 

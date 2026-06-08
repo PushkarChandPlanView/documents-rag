@@ -2,23 +2,61 @@ import { DragEvent, useRef, useState } from "react";
 import styled from "styled-components";
 import { borderRadius, color, spacing, text } from "@planview/pv-utilities";
 import { ButtonPrimary } from "@planview/pv-uikit";
+import {
+  Upload,
+  Trash,
+  CheckmarkCircle,
+  CheckmarkCircleFilled,
+  CrossCircleFilled,
+  Spinner,
+  MinusCircle,
+  FilePdf,
+  FileWord,
+  FileText,
+  FileImage,
+  FileGeneral,
+} from "@planview/pv-icons";
 import { useUploadDocument } from "@/hooks/useDocuments";
 import { useDocumentStatus } from "@/hooks/useWebSocket";
 import { documentsApi } from "@/api/documents";
 
 const ACCEPTED_TYPES = [
   "application/pdf",
-  "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/msword",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/bmp",
+  "image/webp",
+  "image/gif",
 ];
+
+const IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/bmp",
+  "image/webp",
+  "image/gif",
+]);
 
 // ── Styled components ─────────────────────────────────────────────────────────
 
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
-  min-height: 260px;
+  height: 100%;
+  overflow: hidden;
 `;
 
 const Header = styled.div`
@@ -38,6 +76,7 @@ const FileList = styled.div`
   border: 1px solid ${color.borderLight};
   border-bottom: none;
   flex: 1;
+  overflow-y: auto;
 `;
 
 const FileRow = styled.div`
@@ -47,22 +86,6 @@ const FileRow = styled.div`
   padding: ${spacing.small}px;
   border-bottom: 1px solid ${color.borderLight};
   background: ${color.backgroundNeutral0};
-`;
-
-const FileIconBox = styled.div<{ $ext: string }>`
-  width: 32px;
-  height: 32px;
-  ${borderRadius.small()};
-  background: ${({ $ext }) =>
-    $ext === "pdf" ? "#e53935" : $ext === "docx" || $ext === "doc" ? "#1565c0" : color.textSecondary};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  ${text.small};
-  font-weight: 700;
-  color: ${color.textInverse};
-  flex-shrink: 0;
-  text-transform: uppercase;
 `;
 
 const FileInfo = styled.div`
@@ -109,7 +132,9 @@ const IconBtn = styled.button`
   font-size: 1rem;
   line-height: 1;
   flex-shrink: 0;
-  &:hover { color: ${color.textPrimary}; }
+  &:hover {
+    color: ${color.textPrimary};
+  }
 `;
 
 const PipelinePanel = styled.div`
@@ -123,12 +148,6 @@ const StageList = styled.div`
   gap: ${spacing.xsmall}px;
   flex-wrap: wrap;
   margin-top: ${spacing.xsmall}px;
-`;
-
-const StageDot = styled.span<{ $color: string }>`
-  color: ${({ $color }) => $color};
-  ${text.small};
-  font-weight: 600;
 `;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -146,21 +165,35 @@ function PipelineRow({ documentId }: { documentId: string }) {
       <StageList>
         {stages.map((job) => {
           const stageColor =
-            job.status === "COMPLETED" ? "#2e7d32"
-            : job.status === "FAILED"  ? color.textError
-            : job.status === "IN_PROGRESS" ? color.backgroundPrimary
-            : color.textSecondary;
+            job.status === "COMPLETED"
+              ? "#2e7d32"
+              : job.status === "FAILED"
+                ? color.textError
+                : job.status === "IN_PROGRESS"
+                  ? color.backgroundPrimary
+                  : color.textSecondary;
+          const StageIcon =
+            job.status === "COMPLETED"
+              ? CheckmarkCircleFilled
+              : job.status === "FAILED"
+                ? CrossCircleFilled
+                : job.status === "IN_PROGRESS"
+                  ? Spinner
+                  : MinusCircle;
           return (
             <span key={job.stage} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <StageDot $color={stageColor}>●</StageDot>
+              <StageIcon size={14} color={stageColor} />
               <span style={{ fontSize: "0.72rem", color: stageColor }}>{STAGE_LABELS[job.stage] || job.stage}</span>
             </span>
           );
         })}
       </StageList>
       {isComplete && (
-        <div style={{ fontSize: "0.72rem", color: "#2e7d32", marginTop: 4 }}>
-          ✓ Ready for search and Q&amp;A
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.72rem", color: "#2e7d32", marginTop: 4 }}
+        >
+          <CheckmarkCircle size={14} color="#2e7d32" />
+          Ready for search and Q&amp;A
         </div>
       )}
     </PipelinePanel>
@@ -178,8 +211,11 @@ const DropZone = styled.div<{ $dragging: boolean }>`
   gap: ${spacing.xsmall}px;
   cursor: pointer;
   background: ${({ $dragging }) => ($dragging ? color.primary0 : color.backgroundNeutral0)};
-  transition: background 0.15s, border-color 0.15s;
-  min-height: 260px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  height: 100%;
+  box-sizing: border-box;
 `;
 
 const ChooseRow = styled.div`
@@ -265,7 +301,9 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
     const newItems: UploadItem[] = [];
     for (const file of Array.from(files)) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
-        setBannerError(`"${file.name}" is not a supported type (PDF, DOCX, TXT).`);
+        setBannerError(
+          `"${file.name}" is not a supported type (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, PNG, JPG, TIFF, BMP, WebP, GIF).`,
+        );
         continue;
       }
       if (file.size > 100 * 1024 * 1024) {
@@ -289,10 +327,6 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
     }
     setItems((prev) => prev.filter((i) => i.localId !== item.localId));
   };
-
-  const toggleExpand = (localId: string) =>
-    setItems((prev) => prev.map((i) => (i.localId === localId ? { ...i, expanded: !i.expanded } : i)));
-
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -311,23 +345,33 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
     return (
       <DropZone
         $dragging={isDragging}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
       >
-        <span style={{ fontSize: "0.95rem", fontWeight: 500, color: color.textPrimary }}>
-          Drag and drop files here
-        </span>
+        <Upload size={40} color={color.textSecondary} />
+        <span style={{ fontSize: "0.95rem", fontWeight: 500, color: color.textPrimary }}>Drag and drop files here</span>
         <span style={{ fontSize: "0.875rem", color: color.textSecondary }}>or</span>
-        <ButtonPrimary onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+        <ButtonPrimary
+          onClick={(e) => {
+            e.stopPropagation();
+            fileInputRef.current?.click();
+          }}
+        >
           Choose files
         </ButtonPrimary>
+        <span style={{ fontSize: "0.75rem", color: color.textSecondary, textAlign: "center" }}>
+          PDF, DOCX, XLSX, PPTX, TXT, MD, CSV · PNG, JPG, TIFF, BMP, WebP, GIF
+        </span>
         <HiddenInput
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".pdf,.docx,.doc,.txt"
+          accept=".pdf,.docx,.doc,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.gif"
           onChange={(e) => handleFiles(e.target.files)}
         />
       </DropZone>
@@ -336,28 +380,45 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
 
   return (
     <Wrapper
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={onDrop}
     >
       <Header>
-        <span>Uploading {uploadingCount} file{uploadingCount !== 1 ? "s" : ""}</span>
-        <span>{fmtBytes(uploadedBytes)}/{fmtBytes(totalBytes)} uploaded</span>
+        <span>
+          Uploading {uploadingCount} file{uploadingCount !== 1 ? "s" : ""}
+        </span>
+        <span>
+          {fmtBytes(uploadedBytes)}/{fmtBytes(totalBytes)} uploaded
+        </span>
       </Header>
 
       <FileList>
         {items.map((item) => (
           <div key={item.localId}>
             <FileRow>
-              <FileIconBox $ext={fileExt(item.file)}>
-                {fileExt(item.file) || "?"}
-              </FileIconBox>
+              {fileExt(item.file) === "pdf" ? (
+                <FilePdf />
+              ) : fileExt(item.file) === "docx" || fileExt(item.file) === "doc" ? (
+                <FileWord />
+              ) : fileExt(item.file) === "txt" ? (
+                <FileText />
+              ) : IMAGE_TYPES.has(item.file.type) ? (
+                <FileImage />
+              ) : (
+                <FileGeneral />
+              )}
               <FileInfo>
                 <FileName title={item.file.name}>{item.file.name}</FileName>
                 {item.status === "uploading" ? (
                   <>
                     <FileStatus>{item.progress}% uploading…</FileStatus>
-                    <ProgressBar><ProgressFill $pct={item.progress} /></ProgressBar>
+                    <ProgressBar>
+                      <ProgressFill $pct={item.progress} />
+                    </ProgressBar>
                   </>
                 ) : item.status === "done" ? (
                   <FileStatus>Uploaded successfully</FileStatus>
@@ -371,20 +432,10 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
                 disabled={item.status === "uploading"}
                 style={{ opacity: item.status === "uploading" ? 0.3 : 1 }}
               >
-                ×
+                <Trash size={16} />
               </IconBtn>
-              {item.status === "done" && item.documentId && (
-                <IconBtn
-                  title={item.expanded ? "Collapse" : "Show processing stages"}
-                  onClick={() => toggleExpand(item.localId)}
-                >
-                  {item.expanded ? "▾" : "›"}
-                </IconBtn>
-              )}
             </FileRow>
-            {item.expanded && item.documentId && (
-              <PipelineRow documentId={item.documentId} />
-            )}
+            {item.expanded && item.documentId && <PipelineRow documentId={item.documentId} />}
           </div>
         ))}
       </FileList>
@@ -392,9 +443,7 @@ export function FileUpload({ onUploaded, onRemoved, folderId }: FileUploadProps)
       {bannerError && <ErrorBanner>{bannerError}</ErrorBanner>}
 
       <ChooseRow>
-        <ButtonPrimary onClick={() => fileInputRef.current?.click()}>
-          Choose files
-        </ButtonPrimary>
+        <ButtonPrimary onClick={() => fileInputRef.current?.click()}>Choose files</ButtonPrimary>
       </ChooseRow>
 
       <HiddenInput

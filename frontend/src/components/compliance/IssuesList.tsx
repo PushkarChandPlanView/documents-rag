@@ -4,8 +4,8 @@ import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { Grid, GridCellBase } from "@planview/pv-grid";
 import type { Column, GridRowMeta } from "@planview/pv-grid";
-import { ButtonEmpty } from "@planview/pv-uikit";
-import { ComplianceBadge } from "./ComplianceBadge";
+import { ButtonEmpty, Chip } from "@planview/pv-uikit";
+import { Warning } from "@planview/pv-icons";
 import { useComplianceIssues } from "@/hooks/useCompliance";
 import type { ComplianceIssueFailedRule, ComplianceIssueItem, ComplianceStatus } from "@/types/compliance";
 
@@ -25,6 +25,13 @@ type IssueRow = {
 type IssueRowMeta = GridRowMeta<IssueRow>;
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const COLOR_MAP: Record<ComplianceStatus, string> = {
+  COMPLIANT: color.success100,
+  WARNING: color.warning100,
+  NON_COMPLIANT: color.error100,
+  UNCHECKED: color.gray100,
+  SCANNING: color.info100,
+};
 
 const Wrapper = styled.div`
   display: flex;
@@ -48,29 +55,12 @@ const DocNameBtn = styled.button`
   font-weight: 600;
   color: ${color.backgroundPrimary};
   text-align: left;
-  &:hover { text-decoration: underline; }
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
-const StaleIcon = styled.span`
-  font-size: 10px;
-  color: #e65100;
-  margin-left: 4px;
-  vertical-align: super;
-`;
 
-const FailingRulesCell = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-`;
-
-const RuleChip = styled.span<{ $severity: string }>`
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-size: 10px;
-  background: ${({ $severity }) => ($severity === "critical" ? "#fccfcf" : "#ffdcb9")};
-  color: ${({ $severity }) => ($severity === "critical" ? "#b71c1c" : "#bf360c")};
-`;
 
 const LoadMore = styled.div`
   display: flex;
@@ -125,111 +115,107 @@ interface Props {
 
 export function IssuesList({ statusFilter }: Props) {
   const navigate = useNavigate();
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useComplianceIssues(statusFilter ?? undefined);
-
-  const items = useMemo(
-    () => data?.pages.flatMap((p) => p.items) ?? [],
-    [data]
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useComplianceIssues(
+    statusFilter ?? undefined,
   );
+
+  const items = useMemo(() => data?.pages.flatMap((p) => p.items) ?? [], [data]);
 
   const gridData = useMemo(() => buildGridData(items), [items]);
 
-  const columns = useMemo((): Column<IssueRow>[] => [
-    {
-      id: "documentName",
-      label: "Document",
-      minWidth: 160,
-      width: 260,
-      resizable: true,
-      cell: {
-        Renderer: ({ rowId, tabIndex }) => {
-          const row = gridData.data.get(String(rowId));
-          if (!row) return <></>;
-          return (
-            <GridCellBase tabIndex={tabIndex}>
-              <DocNameBtn
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/documents?doc=${row.documentId}&tab=compliance`);
-                }}
-              >
-                {row.documentName}
-              </DocNameBtn>
-            </GridCellBase>
-          );
+  const columns = useMemo(
+    (): Column<IssueRow>[] => [
+      {
+        id: "documentName",
+        label: "Document",
+        minWidth: 160,
+        width: 260,
+        resizable: true,
+        cell: {
+          Renderer: ({ rowId, tabIndex }) => {
+            const row = gridData.data.get(String(rowId));
+            if (!row) return <></>;
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                <DocNameBtn
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/documents/${row.documentId}`);
+                  }}
+                >
+                  {row.documentName}
+                </DocNameBtn>
+              </GridCellBase>
+            );
+          },
         },
       },
-    },
-    {
-      id: "status",
-      label: "Status",
-      width: 150,
-      cell: {
-        Renderer: ({ rowId, tabIndex }) => {
-          const row = gridData.data.get(String(rowId));
-          if (!row) return <></>;
-          return (
-            <GridCellBase tabIndex={tabIndex}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <ComplianceBadge status={row.status} />
-                {row.isStale && (
-                  <StaleIcon title="Rules updated — rescan recommended">⚠</StaleIcon>
-                )}
-              </span>
-            </GridCellBase>
-          );
+      {
+        id: "status",
+        label: "Status",
+        width: 150,
+        cell: {
+          Renderer: ({ rowId, tabIndex }) => {
+            const row = gridData.data.get(String(rowId));
+            if (!row) return <></>;
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                <Chip
+                  label={row.status}
+                  icon={row.isStale ? <Warning /> : undefined}
+                  color={COLOR_MAP[row.status]}
+                  disabled
+                />
+              </GridCellBase>
+            );
+          },
         },
       },
-    },
-    {
-      id: "checkedAt",
-      label: "Checked",
-      width: 150,
-      cell: {
-        Renderer: ({ rowId, tabIndex }) => {
-          const row = gridData.data.get(String(rowId));
-          if (!row) return <></>;
-          return (
-            <GridCellBase tabIndex={tabIndex}>
-              <span style={{ fontSize: 12, color: color.textSecondary }}>
-                {fmtDate(row.checkedAt)}
-              </span>
-            </GridCellBase>
-          );
+      {
+        id: "checkedAt",
+        label: "Checked",
+        width: 150,
+        cell: {
+          Renderer: ({ rowId, tabIndex }) => {
+            const row = gridData.data.get(String(rowId));
+            if (!row) return <></>;
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                <span style={{ fontSize: 12, color: color.textSecondary }}>{fmtDate(row.checkedAt)}</span>
+              </GridCellBase>
+            );
+          },
         },
       },
-    },
-    {
-      id: "failingRules",
-      label: "Failed Rules",
-      minWidth: 160,
-      width: 300,
-      resizable: true,
-      cell: {
-        Renderer: ({ rowId, tabIndex }) => {
-          const row = gridData.data.get(String(rowId));
-          if (!row) return <></>;
-          return (
-            <GridCellBase tabIndex={tabIndex}>
-              <FailingRulesCell>
-                {row.failingRules.slice(0, 3).map((r, i) => (
-                  <RuleChip key={i} $severity={r.severity} title={r.detail ?? r.rule_name}>
-                    {r.rule_name}
-                  </RuleChip>
+      {
+        id: "failingRules",
+        label: "Failed Rules",
+        minWidth: 160,
+        width: 300,
+        resizable: true,
+        cell: {
+          Renderer: ({ rowId, tabIndex }) => {
+            const row = gridData.data.get(String(rowId));
+            if (!row) return <></>;
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                {row.failingRules.map((r, i) => (
+                  <Chip
+                    disabled
+                    key={i}
+                    color={r.severity === "critical" ? color.error100 : color.warning100}
+                    label={r.rule_name}
+                    tooltip={r.detail ?? r.rule_name}
+                  />
                 ))}
-                {row.failingRules.length > 3 && (
-                  <RuleChip $severity="warning">
-                    +{row.failingRules.length - 3} more
-                  </RuleChip>
-                )}
-              </FailingRulesCell>
-            </GridCellBase>
-          );
+              </GridCellBase>
+            );
+          },
         },
       },
-    },
-  ], [gridData, navigate]);
+    ],
+    [gridData, navigate],
+  );
 
   if (isLoading) return <Empty>Loading issues…</Empty>;
   if (!items.length) return <Empty>No compliance issues found.</Empty>;
@@ -246,7 +232,7 @@ export function IssuesList({ statusFilter }: Props) {
           selectionMode="none"
           onRowClick={(rowId) => {
             const row = gridData.data.get(String(rowId));
-            if (row) navigate(`/documents?doc=${row.documentId}&tab=compliance`);
+            if (row) navigate(`/documents/${row.documentId}`);
           }}
         />
       </GridWrapper>

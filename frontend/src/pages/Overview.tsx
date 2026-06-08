@@ -57,6 +57,9 @@ const DocCard = styled.div<{ $color: string }>`
   border-radius: 8px;
   background: ${({ $color }) => $color}18;
   border: 1px solid ${({ $color }) => $color}30;
+  &:hover {
+    border-color: ${({ $color }) => $color};
+  }
 `;
 
 const DocCount = styled.div<{ $color: string }>`

@@ -1,6 +1,6 @@
 import styled from "styled-components";
-import { color, spacing, text } from "@planview/pv-utilities";
-import { ButtonEmpty, Chip, Divider, Spinner } from "@planview/pv-uikit";
+import { align, color, spacing, text } from "@planview/pv-utilities";
+import { ButtonEmpty, Chip, Divider } from "@planview/pv-uikit";
 import {
   CheckmarkCircleFilled,
   CrossCircleFilled,
@@ -24,15 +24,14 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  display: flex;
-  align-items: center;
+  ${align.centerH}
   justify-content: space-between;
 `;
 
 const StatusRow = styled.div`
   display: flex;
-  align-items: center;
   gap: ${spacing.small}px;
+  flex-direction: column;
 `;
 
 const CheckedAt = styled.span`
@@ -47,9 +46,8 @@ const Banner = styled.div<{ $variant: "warning" | "info" }>`
   padding: ${spacing.small}px ${spacing.medium}px;
   border-radius: 6px;
   ${text.small};
-  background: ${({ $variant }) => ($variant === "warning" ? "#fff3e0" : "#e3f2fd")};
-  border-left: 4px solid ${({ $variant }) => ($variant === "warning" ? "#e65100" : "#1565c0")};
-  color: ${({ $variant }) => ($variant === "warning" ? "#e65100" : "#1565c0")};
+  background: ${({ $variant }) => ($variant === "warning" ? color.warning100 : color.info100)};
+  color: ${({ $variant }) => ($variant === "warning" ? color.warning600 : color.info600)};
 
   svg {
     flex-shrink: 0;
@@ -64,8 +62,8 @@ const BannerText = styled.span`
 const InsightsCard = styled.div`
   padding: ${spacing.medium}px;
   border-radius: 6px;
-  background: #fff8f0;
-  border: 1px solid #ffcc80;
+  background: ${color.warning100};
+  border: 1px solid ${color.warning400};
   display: flex;
   flex-direction: column;
   gap: ${spacing.xsmall}px;
@@ -275,7 +273,6 @@ export function ComplianceTab({ documentId }: Props) {
           {ScanButton}
         </Header>
         <Banner $variant="info">
-          <Spinner size="small" />
           <BannerText>Scan in progress — checking all compliance rules. This page will update automatically.</BannerText>
         </Banner>
       </Container>

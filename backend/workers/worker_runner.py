@@ -17,6 +17,7 @@ WORKER_MAP = {
     "embedding": "embedding.consumer.EmbeddingConsumer",
     "summarization": "summarization.consumer.SummarizationConsumer",
     "compliance": "compliance.consumer.ComplianceConsumer",
+    "compliance_rag": "compliance.consumer.ComplianceAfterRagConsumer",
 }
 
 

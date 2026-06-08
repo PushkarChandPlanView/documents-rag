@@ -51,7 +51,9 @@ export interface UnifiedListResponse {
 export interface DocumentDetailResponse {
   type: "document";
   id: string;
+  name: string;
   filename: string;
+  description: string | null;
   mime_type: string;
   file_size_bytes: number;
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";

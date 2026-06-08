@@ -57,6 +57,12 @@ export const useAuthStore = create<AuthState>()(
         userEmail: state.userEmail,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.accessToken) {
+          const payload = decodeJwtPayload(state.accessToken);
+          state.isAdmin = Boolean(payload.is_admin);
+        }
+      },
     }
   )
 );

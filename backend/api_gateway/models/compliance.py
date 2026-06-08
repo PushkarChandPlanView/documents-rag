@@ -83,6 +83,7 @@ class ComplianceRuleResult(Base):
     rule_name: Mapped[str] = mapped_column(String(255), nullable=False)
     rule_type: Mapped[str] = mapped_column(String(50), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    enforcement: Mapped[str] = mapped_column(String(20), nullable=False, default="advisory")
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     locations: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)

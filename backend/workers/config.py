@@ -30,6 +30,7 @@ class WorkerSettings(BaseSettings):
     kafka_consumer_group_embedding: str = "embedding-workers"
     kafka_consumer_group_summarization: str = "summarization-workers"
     kafka_consumer_group_compliance: str = "compliance-workers"
+    kafka_consumer_group_compliance_rag: str = "compliance-rag-workers"
 
     # Ollama
     ollama_base_url: str = "http://ollama:11434"

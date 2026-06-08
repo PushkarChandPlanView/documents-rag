@@ -29,6 +29,14 @@ ALLOWED_MIME_TYPES = {
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "application/vnd.ms-powerpoint",
+    # Images — text extracted via Tesseract OCR
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+    "image/gif",
 }
 
 router = APIRouter(prefix="/documents", tags=["documents"])

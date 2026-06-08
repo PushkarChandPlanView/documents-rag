@@ -21,6 +21,36 @@ export function useDocument(id: string) {
   });
 }
 
+export function useItemDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: ["document", id],
+    queryFn: async () => {
+      const doc = await documentsApi.get(id!);
+      // Map DocumentDetailResponse → UnifiedItem so DetailsPane can render on refresh
+      const item: import("@/types").UnifiedItem = {
+        type: "document",
+        id: doc.id,
+        name: doc.name ?? doc.filename,
+        filename: doc.filename,
+        description: doc.description,
+        parent_id: doc.folder_id,
+        parent_name: doc.folder_name,
+        folder_id: null,
+        mime_type: doc.mime_type,
+        file_size_bytes: doc.file_size_bytes,
+        status: doc.status,
+        source_url: doc.source_url,
+        processing_jobs: doc.processing_jobs,
+        compliance_status: null,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+      };
+      return item;
+    },
+    enabled: !!id,
+  });
+}
+
 export function useUploadDocument() {
   return useMutation({
     mutationFn: ({

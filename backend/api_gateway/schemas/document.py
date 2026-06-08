@@ -61,7 +61,9 @@ class ItemUpdateRequest(BaseModel):
 class DocumentDetailResponse(BaseModel):
     type: Literal["document"] = "document"
     id: UUID
+    name: str
     filename: str
+    description: Optional[str] = None
     mime_type: str
     file_size_bytes: int
     status: str

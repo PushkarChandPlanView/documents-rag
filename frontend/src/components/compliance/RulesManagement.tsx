@@ -48,14 +48,6 @@ const NameCell = styled.div<{ $dimmed: boolean }>`
   opacity: ${({ $dimmed }) => ($dimmed ? 0.5 : 1)};
 `;
 
-const RuleName = styled.div`
-  ${text.small};
-  font-weight: 600;
-  color: ${color.textPrimary};
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
 
 const ChangedDot = styled.span`
   display: inline-block;

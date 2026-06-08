@@ -23,8 +23,8 @@ class ComplianceRuleCreate(BaseModel):
     @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: str) -> str:
-        if v not in {"critical", "warning"}:
-            raise ValueError("severity must be 'critical' or 'warning'")
+        if v not in {"critical", "high", "warning", "info"}:
+            raise ValueError("severity must be one of: critical, high, warning, info")
         return v
 
 
@@ -38,8 +38,8 @@ class ComplianceRuleUpdate(BaseModel):
     @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in {"critical", "warning"}:
-            raise ValueError("severity must be 'critical' or 'warning'")
+        if v is not None and v not in {"critical", "high", "warning", "info"}:
+            raise ValueError("severity must be one of: critical, high, warning, info")
         return v
 
 
@@ -69,6 +69,7 @@ class ComplianceRuleResultResponse(BaseModel):
     rule_name: str
     rule_type: str
     severity: str
+    enforcement: str = "advisory"
     passed: bool
     detail: Optional[str] = None
     locations: Optional[list[LocationResponse]] = None
@@ -99,6 +100,7 @@ class ComplianceStatsResponse(BaseModel):
 class ComplianceIssueFailedRule(BaseModel):
     rule_name: str
     severity: str
+    enforcement: str = "advisory"
     detail: Optional[str] = None
 
 

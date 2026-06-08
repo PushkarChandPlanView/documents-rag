@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { color, spacing, text } from "@planview/pv-utilities";
+import { color, spacing } from "@planview/pv-utilities";
 import { Grid, GridCellBase } from "@planview/pv-grid";
 import type { Column } from "@planview/pv-grid";
 import type { GridRowMeta } from "@planview/pv-grid";
@@ -9,6 +9,7 @@ import { ButtonAnviEmptyInverse, ButtonPrimary, ListItem } from "@planview/pv-ui
 import {
   AiAnvi,
   FileExcel,
+  FileImage,
   FilePdf,
   FilePowerpoint,
   FileText,
@@ -17,11 +18,14 @@ import {
   Link,
   Trash,
 } from "@planview/pv-icons";
+import { useQueries } from "@tanstack/react-query";
+import { documentsApi } from "@/api/documents";
 import { useDeleteDocument, useDeleteFolder, useDocuments } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
 import type { ComplianceStatus } from "@/types/compliance";
 import { ComplianceBadge } from "@/components/compliance/ComplianceBadge";
 import type { ItemFiltersState } from "./ItemFilters";
+import { FILE_TYPE_MIMES, IMAGE_MIMES, MIME_LABELS } from "@/constants";
 
 // ── Row model ─────────────────────────────────────────────────────────────────
 
@@ -49,32 +53,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const MIME_LABELS: Record<string, string> = {
-  "application/pdf": "PDF",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
-  "application/msword": "Word",
-  "text/plain": "Text",
-  "text/markdown": "Markdown",
-  "text/csv": "CSV",
-  "text/html": "Link",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
-  "application/vnd.ms-excel": "Excel",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PowerPoint",
-  "application/vnd.ms-powerpoint": "PowerPoint",
-};
 
-const FILE_TYPE_MIMES: Record<string, string[]> = {
-  pdf: ["application/pdf"],
-  word: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"],
-  text: ["text/plain"],
-  markdown: ["text/markdown"],
-  csv: ["text/csv"],
-  excel: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"],
-  powerpoint: [
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/vnd.ms-powerpoint",
-  ],
-};
 
 function getMimeLabel(mime: string) {
   return MIME_LABELS[mime] ?? mime.split("/")[1]?.toUpperCase() ?? "Other";
@@ -98,6 +77,7 @@ function getMimeIcon(mime: string): React.ReactNode {
   )
     return <FilePowerpoint />;
   if (mime === "application/pdf") return <FilePdf />;
+  if (IMAGE_MIMES.includes(mime)) return <FileImage />;
   return <FileText />;
 }
 
@@ -133,7 +113,7 @@ function unifiedToRows(items: UnifiedItem[], rootFolderId?: string): DocRow[] {
         _folder: item,
       });
     } else {
-      const folderParent = item.folder_id ?? null;
+      const folderParent = item.parent_id ?? null;
       const parentId = rootFolderId
         ? folderParent === rootFolderId
           ? null
@@ -251,12 +231,30 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
   const { mutate: deleteDoc } = useDeleteDocument();
   const { mutate: deleteFolder } = useDeleteFolder();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [initialised, setInitialised] = useState(false);
+  const [folderIdsToFetch, setFolderIdsToFetch] = useState<string[]>([]);
   const [folderToBeDeleted, setFolderToBeDeleted] = useState<{ id: string; name: string } | null>(null);
   const [fileToBeDeleted, setFileToBeDeleted] = useState<{ id: string; name: string } | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
-  const allItems = useMemo(() => (data?.pages ?? []).flatMap((p) => p.items), [data?.pages]);
+  const folderChildQueries = useQueries({
+    queries: folderIdsToFetch.map((folderId) => ({
+      queryKey: ["folder-children", folderId],
+      queryFn: () => documentsApi.list(null, 100, folderId),
+    })),
+  });
+
+  const allItems = useMemo(() => {
+    const base = (data?.pages ?? []).flatMap((p) => p.items);
+    const nested = folderChildQueries.flatMap((q) => q.data?.items ?? []);
+    const seen = new Set<string>();
+    return [...base, ...nested].filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  // folderChildQueries is a stable-enough reference — changes only when query states update
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.pages, folderChildQueries]);
 
   const gridData = useMemo(() => {
     let rows: DocRow[] = unifiedToRows(allItems, parentId);
@@ -285,14 +283,6 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
 
     return buildGridData(rows);
   }, [allItems, filters, parentId]);
-
-  useMemo(() => {
-    if (!initialised && gridData.ids.length) {
-      const allFolderIds = new Set([...gridData.data.entries()].filter(([, row]) => !row._doc).map(([id]) => id));
-      setExpandedRows(allFolderIds);
-      setInitialised(true);
-    }
-  }, [gridData.ids, initialised]);
 
   const columns = useMemo(
     (): Column<DocRow>[] => [
@@ -422,7 +412,15 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           rows={gridData}
           loading={isLoading && !data}
           expandedRows={expandedRows}
-          onExpandedRowsChange={setExpandedRows}
+          onExpandedRowsChange={(next) => {
+            const newFolderIds = [...next]
+              .filter((id) => !expandedRows.has(id) && !gridData.data.get(id)?._doc)
+              .filter((id) => !folderIdsToFetch.includes(id));
+            if (newFolderIds.length) {
+              setFolderIdsToFetch((prev) => [...prev, ...newFolderIds]);
+            }
+            setExpandedRows(next);
+          }}
           selection={selection}
           selectionMode="single"
           rowHeight="medium"

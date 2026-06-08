@@ -10,7 +10,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    host: true,   // bind to 0.0.0.0 — reachable from other machines on the network
+    port: 5173,
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: "http://localhost:8081",
@@ -19,6 +21,7 @@ export default defineConfig({
       "/ws": {
         target: "ws://localhost:8081",
         ws: true,
+        changeOrigin: true,
       },
     },
   },

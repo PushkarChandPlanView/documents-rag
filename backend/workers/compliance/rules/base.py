@@ -30,6 +30,12 @@ class RuleResult:
     passed: bool
     detail: Optional[str] = None
     locations: Optional[list[Location]] = field(default=None)
+    # LLM-assessed severity (info | warning | high | critical); falls back to rule config
+    severity: Optional[str] = None
+    # advisory → does not block; blocking → prevents publication until resolved
+    enforcement: Optional[str] = None
+    # True when the rule simply does not apply to this document (not a pass, not a fail)
+    not_applicable: bool = False
 
 
 class RuleChecker(ABC):

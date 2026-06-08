@@ -280,7 +280,7 @@ async def get_issues(
     for row in page:
         fail_rows = (await db.execute(
             sql_text(
-                "SELECT rule_name, severity, detail FROM compliance_rule_results "
+                "SELECT rule_name, severity, enforcement, detail FROM compliance_rule_results "
                 "WHERE report_id = :report_id AND passed = false"
             ).bindparams(report_id=row.id)
         )).fetchall()
@@ -292,7 +292,10 @@ async def get_issues(
             checked_at=row.checked_at,
             is_stale=current_hash != row.rules_hash,
             failing_rules=[
-                ComplianceIssueFailedRule(rule_name=f.rule_name, severity=f.severity, detail=f.detail)
+                ComplianceIssueFailedRule(
+                    rule_name=f.rule_name, severity=f.severity,
+                    enforcement=f.enforcement, detail=f.detail,
+                )
                 for f in fail_rows
             ],
         ))

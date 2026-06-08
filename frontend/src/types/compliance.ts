@@ -1,6 +1,7 @@
 export type ComplianceStatus = "COMPLIANT" | "WARNING" | "NON_COMPLIANT" | "UNCHECKED" | "SCANNING";
 export type RuleType = "keyword_required" | "keyword_forbidden" | "age_limit_days" | "llm_check";
-export type Severity = "critical" | "warning";
+export type Severity = "critical" | "high" | "warning" | "info";
+export type Enforcement = "blocking" | "advisory";
 
 export interface ComplianceRule {
   id: string;
@@ -42,6 +43,7 @@ export interface ComplianceRuleResult {
   rule_name: string;
   rule_type: RuleType;
   severity: Severity;
+  enforcement: Enforcement;
   passed: boolean;
   detail: string | null;
   locations: Location[] | null;
@@ -68,6 +70,7 @@ export interface ComplianceStats {
 export interface ComplianceIssueFailedRule {
   rule_name: string;
   severity: Severity;
+  enforcement: Enforcement;
   detail: string | null;
 }
 

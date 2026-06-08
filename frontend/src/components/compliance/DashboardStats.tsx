@@ -11,7 +11,7 @@ const Grid = styled.div`
 const Card = styled.button<{ $active: boolean; $color: string }>`
   padding: ${spacing.medium}px;
   border-radius: 8px;
-  border: 2px solid ${({ $active, $color }) => ($active ? $color : "transparent")};
+  border: 1px solid ${({ $active, $color }) => ($active ? $color : "transparent")};
   background: ${({ $color }) => $color}18;
   cursor: pointer;
   text-align: left;

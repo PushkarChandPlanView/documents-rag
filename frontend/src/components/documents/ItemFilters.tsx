@@ -4,11 +4,14 @@ import { FilterPanel, FilterSectionList } from "@planview/pv-filter";
 // ── Static option lists ───────────────────────────────────────────────────────
 
 const FILE_TYPE_OPTIONS = [
-  { id: "pdf",      label: "PDF" },
-  { id: "word",     label: "Word" },
-  { id: "text",     label: "Text" },
-  { id: "markdown", label: "Markdown" },
-  { id: "csv",      label: "CSV" },
+  { id: "pdf",        label: "PDF" },
+  { id: "word",       label: "Word" },
+  { id: "text",       label: "Text" },
+  { id: "markdown",   label: "Markdown" },
+  { id: "csv",        label: "CSV" },
+  { id: "excel",      label: "Excel" },
+  { id: "powerpoint", label: "PowerPoint" },
+  { id: "image",      label: "Image" },
 ];
 
 const STATUS_OPTIONS = [

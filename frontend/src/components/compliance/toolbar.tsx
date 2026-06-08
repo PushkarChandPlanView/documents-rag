@@ -7,7 +7,7 @@ import {
   ToolbarSectionRight,
   ToolbarSeparator,
 } from "@planview/pv-toolbar";
-import { ButtonEmpty, ButtonEmptyInverse, ButtonGhost, ButtonPrimary } from "@planview/pv-uikit";
+import { ButtonEmpty, ButtonPrimary } from "@planview/pv-uikit";
 import { DotsHorizontal, Help, ResizeFull } from "@planview/pv-icons";
 
 const Title = styled.span`
@@ -24,17 +24,6 @@ const DirtyBadge = styled.span`
   border-radius: 12px;
 `;
 
-const AddBtn = styled.button`
-  padding: 5px 12px;
-  border-radius: 4px;
-  border: none;
-  background: #1976d2;
-  color: white;
-  ${text.small};
-  font-weight: 600;
-  cursor: pointer;
-  height: 28px;
-`;
 
 const ActionGroup = styled.div`
   display: flex;

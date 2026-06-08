@@ -24,8 +24,10 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Overview />} />
             <Route path="/documents" element={<Documents />} />
+            <Route path="/documents/:docId" element={<Documents />} />
             <Route path="/search" element={<SearchBar />} />
             <Route path="/folders/:folderId" element={<Documents />} />
+            <Route path="/folders/:folderId/:docId" element={<Documents />} />
             <Route path="/compliance" element={<Compliance />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

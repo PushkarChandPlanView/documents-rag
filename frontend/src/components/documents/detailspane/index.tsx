@@ -2,7 +2,20 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { DetailsPanel, DetailsPanelSection } from "@planview/pv-details";
-import { AiAnvi, CheckmarkCircle, Info, Refresh } from "@planview/pv-icons";
+import {
+  AiAnvi,
+  CheckmarkCircle,
+  FileExcel,
+  FileImage,
+  FilePdf,
+  FilePowerpoint,
+  FileText,
+  FileWord,
+  Folder,
+  Info,
+  Link,
+  Refresh,
+} from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { ComplianceTab } from "@/components/compliance/ComplianceTab";
@@ -10,6 +23,7 @@ import { DescriptionEditor } from "./DescriptionEditor";
 import { useReprocessDocument } from "@/hooks/useDocuments";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
 import { NameField } from "./NameField";
+import { IMAGE_MIMES } from "@/constants";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,9 +101,38 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
     ...(canChat ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle /> }] : []),
   ];
 
+  const getSelection = (item: UnifiedItem) => {
+    if (item.type === "document") {
+      const mime = item.mime_type;
+      if (mime === "text/html") return <Link />;
+      if (
+        mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        mime === "application/msword"
+      )
+        return <FileWord />;
+      if (
+        mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        mime === "application/vnd.ms-excel"
+      )
+        return <FileExcel />;
+      if (
+        mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+        mime === "application/vnd.ms-powerpoint"
+      )
+        return <FilePowerpoint />;
+      if (mime === "application/pdf") return <FilePdf />;
+      if (mime && IMAGE_MIMES.includes(mime)) return <FileImage />;
+      return <FileText />;
+    }
+    return <Folder />;
+  };
+
   return (
     <DetailsPanel
-      header={item.name}
+      header={{
+        label: item.name,
+        icon: getSelection(item),
+      }}
       onClose={onClose}
       tabs={tabs}
       activeTab={activeTab}
@@ -117,7 +160,7 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
                   <MetaValue>{doc.mime_type}</MetaValue>
 
                   <MetaLabel>Size</MetaLabel>
-                  <MetaValue>{doc.file_size_bytes !== null ? formatBytes(doc.file_size_bytes) : 'N/A'}</MetaValue>
+                  <MetaValue>{doc.file_size_bytes !== null ? formatBytes(doc.file_size_bytes) : "N/A"}</MetaValue>
 
                   <MetaLabel>Status</MetaLabel>
                   <MetaValue>{doc.status}</MetaValue>
@@ -126,11 +169,7 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
                     <>
                       <MetaLabel />
                       <MetaValue>
-                        <ButtonEmpty
-                          icon={<Refresh />}
-                          onClick={() => reprocess(doc!.id)}
-                          disabled={reprocessing}
-                        >
+                        <ButtonEmpty icon={<Refresh />} onClick={() => reprocess(doc!.id)} disabled={reprocessing}>
                           {reprocessing ? "Reprocessing…" : "Reprocess"}
                         </ButtonEmpty>
                       </MetaValue>

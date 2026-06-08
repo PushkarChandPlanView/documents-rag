@@ -1,14 +1,20 @@
 import { useRef } from "react";
-import { Modal, MODAL_MEDIUM } from "@planview/pv-uikit";
+import { Modal, MODAL_LARGE } from "@planview/pv-uikit";
 import { FileUpload } from "./FileUpload";
 import { documentsApi } from "@/api/documents";
 import { queryClient } from "@/store/queryClient";
+import styled from "styled-components";
 
 interface FileUploadDialogProps {
   open: boolean;
   onClose: () => void;
   folderId?: string;
 }
+
+const Container = styled.div`
+  height: 450px;
+  box-sizing: border-box;
+`;
 
 export function FileUploadDialog({ open, onClose, folderId }: FileUploadDialogProps) {
   const uploadedDocIds = useRef<Set<string>>(new Set());
@@ -36,13 +42,15 @@ export function FileUploadDialog({ open, onClose, folderId }: FileUploadDialogPr
       cancelText="Cancel"
       onConfirm={handleConfirm}
       onCancel={handleCancel}
-      size={MODAL_MEDIUM}
+      size={MODAL_LARGE}
     >
-      <FileUpload
-        onUploaded={(docId) => { uploadedDocIds.current.add(docId); }}
-        onRemoved={(docId) => { uploadedDocIds.current.delete(docId); }}
-        folderId={folderId}
-      />
+      <Container>
+        <FileUpload
+          onUploaded={(docId) => { uploadedDocIds.current.add(docId); }}
+          onRemoved={(docId) => { uploadedDocIds.current.delete(docId); }}
+          folderId={folderId}
+        />
+      </Container>
     </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import styled from "styled-components";
 import { ContentLayout } from "@planview/pv-uikit";
 import Layout from "@/components/layout/Layout";
@@ -14,6 +15,7 @@ import type { ItemFiltersState } from "@/components/documents/ItemFilters";
 import type { DetailTab } from "@/components/documents/detailspane";
 import type { DocumentItem, UnifiedItem } from "@/types";
 import { useFolderBreadcrumb } from "@/hooks/useFolders";
+import { useItemDetail } from "@/hooks/useDocuments";
 
 const PageWrapper = styled.div`
   display: flex;
@@ -37,14 +39,19 @@ const MiddleContent = styled.div`
   overflow: hidden;
 `;
 
-type Selection = { item: UnifiedItem; tab: DetailTab } | null;
-
 export default function Documents() {
   const navigate = useNavigate();
-  const { folderId } = useParams<{ folderId?: string }>();
-  const { data: breadcrumb = [] } = useFolderBreadcrumb(folderId ?? "");
+  const { folderId, docId } = useParams<{ folderId?: string; docId?: string }>();
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
-  const [selection, setSelection] = useState<Selection>(null);
+  const { data: breadcrumb = [] } = useFolderBreadcrumb(folderId ?? "");
+  const selectedTab = (searchParams.get("tab") as DetailTab) ?? "details";
+
+  // On refresh: useItemDetail fetches from GET /documents/:id.
+  // On normal click: query cache is pre-seeded so it resolves instantly.
+  const { data: selectedItem } = useItemDetail(docId);
+
   const [uploadOpen, setUploadOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [addLinkOpen, setAddLinkOpen] = useState(false);
@@ -54,16 +61,28 @@ export default function Documents() {
     statuses: new Set(),
   });
 
+  const docPath = (id: string) =>
+    folderId ? `/folders/${folderId}/${id}` : `/documents/${id}`;
+
+  const primeCache = (item: UnifiedItem) =>
+    queryClient.setQueryData(["document", item.id], item);
+
   const handleSelect = (item: UnifiedItem) => {
-    setSelection((prev) => prev?.item.id === item.id ? null : { item, tab: "details" });
+    if (item.id === docId) {
+      navigate(folderId ? `/folders/${folderId}` : "/documents", { replace: true });
+    } else {
+      primeCache(item);
+      navigate(docPath(item.id), { replace: true });
+    }
   };
 
   const handleChatOpen = (doc: DocumentItem) => {
-    setSelection({ item: doc, tab: "chat" });
+    primeCache(doc);
+    navigate(`${docPath(doc.id)}?tab=chat`, { replace: true });
   };
 
   const handleBreadcrumbNavigate = (id: string | null) => {
-    navigate(id ? `/folders/${id}` : "/");
+    navigate(id ? `/folders/${id}` : "/documents");
   };
 
   return (
@@ -81,7 +100,7 @@ export default function Documents() {
         <LayoutArea>
           <ContentLayout
             left={{ width: "small", open: filterOpen }}
-            right={{ width: "medium", open: !!selection }}
+            right={{ width: "medium", open: !!docId }}
           >
             <ContentLayout.Left label="Filters">
               <ItemFilters value={filters} onChange={setFilters} />
@@ -94,18 +113,18 @@ export default function Documents() {
                   onSelect={handleSelect}
                   onChatOpen={handleChatOpen}
                   onFolderOpen={(id) => navigate(`/folders/${id}`)}
-                  selectedId={selection?.item.id}
+                  selectedId={docId}
                   filters={filters}
                 />
               </MiddleContent>
             </ContentLayout.Middle>
 
             <ContentLayout.Right label="Details">
-              {selection && (
+              {selectedItem && (
                 <DetailsPane
-                  item={selection.item}
-                  activeTab={selection.tab}
-                  onClose={() => setSelection(null)}
+                  item={selectedItem}
+                  activeTab={selectedTab}
+                  onClose={() => navigate(folderId ? `/folders/${folderId}` : "/documents", { replace: true })}
                 />
               )}
             </ContentLayout.Right>
