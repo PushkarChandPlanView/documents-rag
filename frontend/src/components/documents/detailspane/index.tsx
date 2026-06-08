@@ -73,7 +73,7 @@ const ChatFill = styled.div`
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export type DetailTab = "details" | "chat" | "compliance";
+export type DetailTab = "details" | "preview" | "chat" | "compliance";
 
 interface ItemDetailsPaneProps {
   item: UnifiedItem;

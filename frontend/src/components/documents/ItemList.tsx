@@ -16,8 +16,10 @@ import {
   FileWord,
   Folder,
   Link,
+  Preview,
   Trash,
 } from "@planview/pv-icons";
+import { PreviewPane } from "@/components/documents/detailspane/PreviewPane";
 import { useQueries } from "@tanstack/react-query";
 import { documentsApi } from "@/api/documents";
 import { useDeleteDocument, useDeleteFolder, useDocuments } from "@/hooks/useDocuments";
@@ -235,6 +237,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
   const [folderToBeDeleted, setFolderToBeDeleted] = useState<{ id: string; name: string } | null>(null);
   const [fileToBeDeleted, setFileToBeDeleted] = useState<{ id: string; name: string } | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
   const folderChildQueries = useQueries({
     queries: folderIdsToFetch.map((folderId) => ({
@@ -431,18 +434,27 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
             else if (row._folder) onSelect(row._folder);
           }}
           actionsMenu={({ row }) => (
-            <ListItem
-              icon={<Trash />}
-              label="Delete"
-              onActivate={() => {
-                if (row._doc) {
-                  setFileToBeDeleted({ id: row._doc.id, name: row._doc.name });
-                } else {
-                  setFolderToBeDeleted({ id: row.id, name: row.name });
-                }
-                setShowConfirmDelete(true);
-              }}
-            />
+            <>
+              {row._doc && (
+                <ListItem
+                  icon={<Preview />}
+                  label="Preview"
+                  onActivate={() => setPreviewDoc(row._doc!)}
+                />
+              )}
+              <ListItem
+                icon={<Trash />}
+                label="Delete"
+                onActivate={() => {
+                  if (row._doc) {
+                    setFileToBeDeleted({ id: row._doc.id, name: row._doc.name });
+                  } else {
+                    setFolderToBeDeleted({ id: row.id, name: row.name });
+                  }
+                  setShowConfirmDelete(true);
+                }}
+              />
+            </>
           )}
         />
       </div>
@@ -469,6 +481,10 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           <p>Are you sure you want to delete this {folderToBeDeleted ? "folder" : "file"}?</p>
         </Modal>
       ) : null}
+
+      {previewDoc && (
+        <PreviewPane doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+      )}
     </GridWrapper>
   );
 }

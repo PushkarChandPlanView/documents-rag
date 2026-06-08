@@ -66,4 +66,9 @@ export const documentsApi = {
   updateFolder: async (id: string, data: { name?: string; description?: string | null; parent_id?: string | null }): Promise<void> => {
     await apiClient.patch(`/folders/${id}`, data);
   },
+
+  getFile: async (id: string): Promise<Blob> => {
+    const res = await apiClient.get(`/documents/${id}/file`, { responseType: "blob" });
+    return res.data as Blob;
+  },
 };

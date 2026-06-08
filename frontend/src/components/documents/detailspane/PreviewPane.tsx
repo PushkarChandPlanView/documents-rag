@@ -1,0 +1,273 @@
+import { useEffect, useState } from "react";
+import styled from "styled-components";
+import { color, spacing, text } from "@planview/pv-utilities";
+import { ButtonEmpty } from "@planview/pv-uikit";
+import { Cancel } from "@planview/pv-icons";
+import { documentsApi } from "@/api/documents";
+import type { DocumentItem } from "@/types";
+import { IMAGE_MIMES } from "@/constants";
+
+// ── constants ─────────────────────────────────────────────────────────────────
+
+const OFFICE_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+]);
+
+const TEXT_MIMES = new Set(["text/plain", "text/markdown", "text/csv"]);
+
+// ── styles ────────────────────────────────────────────────────────────────────
+
+const Overlay = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+`;
+
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 ${spacing.medium}px;
+  height: 52px;
+  flex-shrink: 0;
+  background: #202124;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+`;
+
+const DocName = styled.span`
+  ${text.small};
+  font-weight: 600;
+  color: #e8eaed;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100% - 80px);
+`;
+
+const CloseBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: #e8eaed;
+  &:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+`;
+
+const Body = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+`;
+
+const PreviewFrame = styled.iframe`
+  width: 100%;
+  flex: 1;
+  border: none;
+  background: #fff;
+  min-height: 0;
+`;
+
+// Images: dark background, centered both axes (Google Drive style)
+const ImageBody = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #202124;
+  padding: ${spacing.large}px;
+`;
+
+const PreviewImage = styled.img`
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+`;
+
+const TextContent = styled.pre`
+  ${text.small};
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: ${spacing.medium}px ${spacing.large}px;
+  flex: 1;
+  margin: 0;
+  background: #fff;
+  font-family: monospace;
+  line-height: 1.7;
+  color: ${color.textPrimary};
+  overflow: auto;
+`;
+
+const Center = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: ${spacing.medium}px;
+  flex: 1;
+  ${text.small};
+  color: ${color.textSecondary};
+  text-align: center;
+  padding: ${spacing.large}px;
+`;
+
+// ── component ─────────────────────────────────────────────────────────────────
+
+interface Props {
+  doc: DocumentItem;
+  onClose: () => void;
+}
+
+export function PreviewPane({ doc, onClose }: Props) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const mime = doc.mime_type ?? "";
+  const isImage = IMAGE_MIMES.includes(mime);
+  const isPdf = mime === "application/pdf";
+  const isText = TEXT_MIMES.has(mime);
+  const isOffice = OFFICE_MIMES.has(mime);
+  const isLink = mime === "text/html";
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isLink || isOffice) {
+      setLoading(false);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    setLoading(true);
+    setError(null);
+    setBlobUrl(null);
+    setTextContent(null);
+
+    documentsApi
+      .getFile(doc.id)
+      .then(async (blob) => {
+        if (isText) {
+          setTextContent(await blob.text());
+        } else {
+          objectUrl = URL.createObjectURL(blob);
+          setBlobUrl(objectUrl);
+        }
+      })
+      .catch(() => setError("Could not load file preview."))
+      .finally(() => setLoading(false));
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [doc.id, mime]);
+
+  const handleDownload = async () => {
+    try {
+      const blob = await documentsApi.getFile(doc.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.name ?? "file";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    }
+  };
+
+  const renderBody = () => {
+    if (isLink) {
+      return (
+        <Center>
+          <span>This document is a web link — no file to preview.</span>
+          {doc.source_url && (
+            <a href={doc.source_url} target="_blank" rel="noreferrer">
+              <ButtonEmpty>Open source URL</ButtonEmpty>
+            </a>
+          )}
+        </Center>
+      );
+    }
+
+    if (isOffice) {
+      return (
+        <Center>
+          <span>Browser preview is not available for this file type.</span>
+          <ButtonEmpty onClick={handleDownload}>Download to open</ButtonEmpty>
+        </Center>
+      );
+    }
+
+    if (loading) return <Center>Loading preview…</Center>;
+    if (error) return <Center>{error}</Center>;
+
+    if (isText && textContent !== null) {
+      return <TextContent>{textContent}</TextContent>;
+    }
+
+    if (isImage && blobUrl) {
+      return (
+        <ImageBody>
+          <PreviewImage src={blobUrl} alt={doc.name ?? "preview"} />
+        </ImageBody>
+      );
+    }
+
+    if (isPdf && blobUrl) {
+      return <PreviewFrame src={blobUrl} title={doc.name ?? "PDF preview"} />;
+    }
+
+    return (
+      <Center>
+        <span>Preview not available.</span>
+        <ButtonEmpty onClick={handleDownload}>Download file</ButtonEmpty>
+      </Center>
+    );
+  };
+
+  return (
+    <Overlay>
+      <Header>
+        <DocName>{doc.name}</DocName>
+        <CloseBtn onClick={onClose} aria-label="Close preview">
+          <Cancel />
+        </CloseBtn>
+      </Header>
+      <Body>{renderBody()}</Body>
+    </Overlay>
+  );
+}
