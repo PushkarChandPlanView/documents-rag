@@ -222,6 +222,34 @@ async def reprocess_document(
     return {"status": "reprocessing"}
 
 
+@router.get("/{document_id}/file")
+async def stream_document_file(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream the raw file bytes for preview or download."""
+    from fastapi.responses import Response as FastAPIResponse
+    item = await item_service.get_item(db, document_id, current_user.id)
+    if not item or item.type != "document":
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not item.minio_key:
+        raise HTTPException(status_code=400, detail="This document has no file (web link only)")
+
+    file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+    mime = item.mime_type or "application/octet-stream"
+    filename = (item.name or "file").replace('"', "")
+    return FastAPIResponse(
+        content=file_bytes,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Length": str(len(file_bytes)),
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: UUID,
