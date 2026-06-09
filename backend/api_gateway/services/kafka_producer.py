@@ -41,5 +41,12 @@ async def publish(topic: str, payload: bytes, key: str | None = None) -> None:
         await producer.send_and_wait(topic=topic, value=payload, key=key)
         logger.debug("Published to topic=%s key=%s", topic, key)
     except Exception as exc:
-        logger.error("Failed to publish to topic=%s: %s", topic, exc)
-        raise
+        logger.warning("Publish failed (%s), resetting producer and retrying once.", exc)
+        await stop_producer()
+        producer = await get_producer()
+        try:
+            await producer.send_and_wait(topic=topic, value=payload, key=key)
+            logger.debug("Published to topic=%s key=%s (after reset)", topic, key)
+        except Exception as retry_exc:
+            logger.error("Failed to publish to topic=%s after reset: %s", topic, retry_exc)
+            raise

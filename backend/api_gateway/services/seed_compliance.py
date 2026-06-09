@@ -38,6 +38,24 @@ DEFAULT_RULES = [
         "params": {"days": 365},
         "severity": "warning",
     },
+    # ── Foul Language ─────────────────────────────────────────────────────────
+    {
+        "name": "No Foul Language",
+        "description": "Forbids profanity and explicit language in documents.",
+        "rule_type": "keyword_forbidden",
+        "params": {
+            "keywords": [
+                "fuck", "fucking", "fucked", "fucker",
+                "shit", "bullshit", "shitty",
+                "asshole", "ass", "bastard",
+                "bitch", "damn", "crap",
+                "cunt", "dick", "cock", "prick",
+                "motherfucker", "motherfucking",
+                "hell", "piss", "pissed",
+            ]
+        },
+        "severity": "critical",
+    },
     # ── Content Quality (LLM) ─────────────────────────────────────────────────
     {
         "name": "No Offensive Language",

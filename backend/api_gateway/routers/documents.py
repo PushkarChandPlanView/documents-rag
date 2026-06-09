@@ -236,9 +236,31 @@ async def stream_document_file(
     if not item.minio_key:
         raise HTTPException(status_code=400, detail="This document has no file (web link only)")
 
-    file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
-    mime = item.mime_type or "application/octet-stream"
-    filename = (item.name or "file").replace('"', "")
+    # If the document has approved edits, serve the updated processed text
+    # instead of the original raw file so the download reflects current content.
+    from sqlalchemy import select as sa_select
+    from models.edit import DocumentEdit
+    approved_edit = (await db.execute(
+        sa_select(DocumentEdit)
+        .where(DocumentEdit.document_id == document_id, DocumentEdit.status == "approved")
+        .order_by(DocumentEdit.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if approved_edit:
+        text_key = f"{document_id}/text.txt"
+        try:
+            file_bytes = storage_service.download_file(settings.minio_bucket_processed, text_key)
+        except Exception:
+            file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+        mime = "text/plain"
+        base_name = (item.name or "document").rsplit(".", 1)[0]
+        filename = f"{base_name}_edited.txt"
+    else:
+        file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+        mime = item.mime_type or "application/octet-stream"
+        filename = (item.name or "file").replace('"', "")
+
     return FastAPIResponse(
         content=file_bytes,
         media_type=mime,

@@ -4,14 +4,33 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from config import get_settings
 from services.auth_service import create_user
+import models.edit  # noqa — registers DocumentEdit mapper before Document relationship resolves
 
 settings = get_settings()
 
 # Rules to seed — skip any whose name already exists in the DB.
 # Existing: No Personal Identifiable Information, No Hardcoded Credentials,
 #           Document Review Freshness, No Offensive Language,
-#           Professional Tone and Completeness
+#           Professional Tone and Completeness, No Foul Language
 COMPLIANCE_RULES = [
+    # ── Foul Language ─────────────────────────────────────────────────────────
+    {
+        "name": "No Foul Language",
+        "description": "Forbids profanity and explicit language in documents.",
+        "rule_type": "keyword_forbidden",
+        "params": {
+            "keywords": [
+                "fuck", "fucking", "fucked", "fucker",
+                "shit", "bullshit", "shitty",
+                "asshole", "ass", "bastard",
+                "bitch", "damn", "crap",
+                "cunt", "dick", "cock", "prick",
+                "motherfucker", "motherfucking",
+                "hell", "piss", "pissed",
+            ]
+        },
+        "severity": "critical",
+    },
     # ── Document Expiration ───────────────────────────────────────────────────
     # Distinct from freshness (warning at 1 yr): hard critical expiry at 2 yrs.
     {

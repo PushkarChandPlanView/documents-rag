@@ -34,6 +34,31 @@ const MdBlockquote = styled.blockquote`
   color: ${color.textSecondary};
   margin: 0 0 ${spacing.xsmall}px;
 `;
+const MdTableWrapper = styled.div`
+  overflow-x: auto;
+  margin: 0 0 ${spacing.xsmall}px;
+  max-width: 100%;
+`;
+const MdTable = styled.table`
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  ${text.regular};
+`;
+const MdTh = styled.th`
+  text-align: left;
+  padding: ${spacing.xsmall}px ${spacing.small}px;
+  border-bottom: 2px solid ${color.borderNormal};
+  font-weight: 600;
+  color: ${color.textPrimary};
+  white-space: nowrap;
+`;
+const MdTd = styled.td`
+  padding: ${spacing.xsmall}px ${spacing.small}px;
+  border-bottom: 1px solid ${color.borderLight};
+  color: ${color.textPrimary};
+  vertical-align: top;
+`;
 
 function normalizeMarkdown(text: string): string {
   return text
@@ -61,6 +86,9 @@ export function AssistantMarkdown({ content }: { content: string }) {
         },
         pre: ({ children }) => <MdPre>{children}</MdPre>,
         blockquote: ({ children }) => <MdBlockquote>{children}</MdBlockquote>,
+        table: ({ children }) => <MdTableWrapper><MdTable>{children}</MdTable></MdTableWrapper>,
+        th: ({ children }) => <MdTh>{children}</MdTh>,
+        td: ({ children }) => <MdTd>{children}</MdTd>,
       }}
     >
       {normalizeMarkdown(content)}

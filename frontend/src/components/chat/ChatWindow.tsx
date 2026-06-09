@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { streamChat } from "@/api/chat";
 import { documentsApi } from "@/api/documents";
+import { editsApi } from "@/api/edits";
 import type { ChatMessage } from "@/types";
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
@@ -54,8 +55,8 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
         setMessages([
           {
             id: crypto.randomUUID(),
-            role: "assistant",
-            content: `**Document Summary**\n\n${doc.summary}`,
+            role: "summary",
+            content: `\n\n${doc.summary}`,
             timestamp: new Date(),
           },
         ]);
@@ -68,6 +69,8 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const EDIT_INTENT_RE = /\b(update|add|remove|rewrite|change|modify|edit|fix|delete|replace|insert|correct)\b/i;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,6 +85,51 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setStreaming(true);
+
+    // ── Edit intent: call the edit API instead of the chat stream ────────────
+    if (documentId && EDIT_INTENT_RE.test(userMsg.content)) {
+      const pendingMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "edit_proposal",
+        content: userMsg.content,
+        status: "Analyzing your request and generating a preview…",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, pendingMsg]);
+      try {
+        const proposal = await editsApi.propose(documentId, userMsg.content);
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            status: undefined,
+            editProposal: {
+              edit_id: proposal.id,
+              document_id: proposal.document_id,
+              original_content: proposal.original_content,
+              proposed_content: proposal.proposed_content,
+              status: proposal.status,
+            },
+          };
+          return updated;
+        });
+      } catch {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            role: "assistant",
+            status: undefined,
+            content: "Sorry, could not generate an edit preview. Please try again.",
+          };
+          return updated;
+        });
+      } finally {
+        setStreaming(false);
+      }
+      return;
+    }
+    // ── Normal chat stream ───────────────────────────────────────────────────
 
     const assistantMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -113,6 +161,7 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
             const splitIdx = thinkingBuf.indexOf("</think>");
 
             if (splitIdx !== -1) {
+              // Found </think>: move buffer to thinking, reset content to answer
               thinkingDone = true;
               const thinkingText = thinkingBuf.slice(0, splitIdx);
               const answerText = thinkingBuf.slice(splitIdx + 8).replace(/^\n+/, "");
@@ -124,18 +173,20 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
                   ...updated[updated.length - 1],
                   status: undefined,
                   thinking: thinkingText || undefined,
+                  thinkingComplete: true,
                   content: answerText,
                 };
                 return updated;
               });
             } else {
+              // No </think> yet — stream directly into content so the user sees output
               const snapshot = thinkingBuf;
               setMessages((prev) => {
                 const updated = [...prev];
                 updated[updated.length - 1] = {
                   ...updated[updated.length - 1],
                   status: undefined,
-                  thinking: snapshot,
+                  content: snapshot,
                 };
                 return updated;
               });
@@ -152,20 +203,6 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
           }
         }
         if (event.done) {
-          // If stream ended without a </think> marker, the model either
-          // didn't think or hit the token limit. Show the buffer as content.
-          if (!thinkingDone && thinkingBuf) {
-            const fallback = thinkingBuf;
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
-                thinking: undefined,
-                content: fallback,
-              };
-              return updated;
-            });
-          }
           if (event.sources && event.sources.length > 0) {
             setMessages((prev) => {
               const updated = [...prev];
