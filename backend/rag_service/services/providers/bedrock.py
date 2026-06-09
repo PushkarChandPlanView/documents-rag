@@ -24,24 +24,43 @@ settings = get_settings()
 _boto_session = aioboto3.Session()
 
 
+def _embed_request_body(text: str, model_id: str) -> str:
+    """Build the embed request body for the given model family."""
+    if "nova" in model_id:
+        # Nova Multimodal Embeddings — Messages API format
+        return json.dumps({
+            "messages": [{"role": "user", "content": text}],
+        })
+    # Titan Embed — legacy inputText format
+    return json.dumps({"inputText": text})
+
+
+def _parse_embed_response(result: dict, model_id: str) -> list[float]:
+    """Extract the float vector from the Bedrock embed response."""
+    if "nova" in model_id:
+        return result["embeddings"][0]["floats"]
+    return result["embedding"]
+
+
 class BedrockProvider:
     async def embed(self, text: str) -> list[float]:
         """
-        Embed a single text with Amazon Titan Embed Text v2.
+        Embed a single text. Supports Titan Embed v2 and Nova Multimodal Embeddings.
         Returns a 1024-dimensional vector.
         """
-        body = json.dumps({"inputText": text})
+        model_id = settings.bedrock_embed_model
+        body = _embed_request_body(text, model_id)
         async with _boto_session.client(
             "bedrock-runtime", region_name=settings.aws_region
         ) as client:
             resp = await client.invoke_model(
-                modelId=settings.bedrock_embed_model,
+                modelId=model_id,
                 body=body,
                 contentType="application/json",
                 accept="application/json",
             )
             result = json.loads(await resp["body"].read())
-            return result["embedding"]
+            return _parse_embed_response(result, model_id)
 
     async def generate_stream(self, prompt: str):
         """

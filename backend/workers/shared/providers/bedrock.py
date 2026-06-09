@@ -22,28 +22,48 @@ _boto_session = aioboto3.Session()
 CONCURRENCY = 4
 
 
+def _embed_request_body(text: str, model_id: str) -> str:
+    """Build the embed request body for the given model family."""
+    if "nova" in model_id:
+        # Nova Multimodal Embeddings — Messages API format
+        return json.dumps({
+            "messages": [{"role": "user", "content": text}],
+        })
+    # Titan Embed — legacy inputText format
+    return json.dumps({"inputText": text})
+
+
+def _parse_embed_response(result: dict, model_id: str) -> list[float]:
+    """Extract the float vector from the Bedrock embed response."""
+    if "nova" in model_id:
+        return result["embeddings"][0]["floats"]
+    return result["embedding"]
+
+
 class BedrockWorkerProvider:
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """
-        Embed a batch of texts concurrently via Titan Embed v2.
+        Embed a batch of texts concurrently.
+        Supports Titan Embed v2 and Nova Multimodal Embeddings.
         Returns a list of 1024-dim vectors in the same order as input.
         """
         sem = asyncio.Semaphore(CONCURRENCY)
+        model_id = settings.bedrock_embed_model
 
         async def _embed_one(text: str) -> list[float]:
             async with sem:
-                body = json.dumps({"inputText": text})
+                body = _embed_request_body(text, model_id)
                 async with _boto_session.client(
                     "bedrock-runtime", region_name=settings.aws_region
                 ) as client:
                     resp = await client.invoke_model(
-                        modelId=settings.bedrock_embed_model,
+                        modelId=model_id,
                         body=body,
                         contentType="application/json",
                         accept="application/json",
                     )
                     result = json.loads(await resp["body"].read())
-                    return result["embedding"]
+                    return _parse_embed_response(result, model_id)
 
         return list(await asyncio.gather(*[_embed_one(t) for t in texts]))
 

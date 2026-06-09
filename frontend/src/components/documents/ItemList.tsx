@@ -366,6 +366,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
             if (!row?._doc || !row.complianceStatus) return <></>;
             return (
               <GridCellBase tabIndex={tabIndex}>
+                
                 <ComplianceBadge status={row.complianceStatus} />
               </GridCellBase>
             );

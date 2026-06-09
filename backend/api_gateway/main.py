@@ -18,12 +18,17 @@ settings = get_settings()
 
 
 async def _auto_seed() -> None:
-    """Create the default admin user if no users exist (fresh database)."""
+    """Create the default admin user if it doesn't already exist."""
+    from sqlalchemy.exc import IntegrityError
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).limit(1))
         if result.scalar_one_or_none() is None:
-            user = await auth_service.create_user(db, "admin@example.com", "changeme")
-            logger.info("Auto-seeded default user: %s", user.email)
+            try:
+                user = await auth_service.create_user(db, "admin@example.com", "changeme")
+                logger.info("Auto-seeded default user: %s", user.email)
+            except IntegrityError:
+                await db.rollback()
+                logger.info("Default user already exists (seeded by another worker), skipping.")
 
 
 @asynccontextmanager

@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Pre-download tiktoken encoding so workers have no outbound network dependency at runtime
 ENV TIKTOKEN_CACHE_DIR=/app/.tiktoken_cache
 RUN mkdir -p /app/.tiktoken_cache && \
-    python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+    python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')" || true
 
 COPY . .
 
