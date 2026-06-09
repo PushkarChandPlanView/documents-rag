@@ -69,6 +69,10 @@ class Document(Base):
         "ComplianceReport", cascade="all, delete-orphan",
         foreign_keys="ComplianceReport.document_id",
     )
+    edits: Mapped[list["DocumentEdit"]] = relationship(  # type: ignore[name-defined]
+        "DocumentEdit", cascade="all, delete-orphan",
+        foreign_keys="DocumentEdit.document_id",
+    )
 
 
 class DocumentChunk(Base):

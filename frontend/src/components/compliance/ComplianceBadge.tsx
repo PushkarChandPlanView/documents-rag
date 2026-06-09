@@ -1,7 +1,6 @@
 import type { ComplianceStatus } from "@/types/compliance";
 import { color } from "@planview/pv-utilities";
 import { Chip } from "@planview/pv-uikit";
-import { DotFilled } from "@planview/pv-icons";
 
 const COLOR_MAP: Record<ComplianceStatus, string> = {
   COMPLIANT: color.success400,

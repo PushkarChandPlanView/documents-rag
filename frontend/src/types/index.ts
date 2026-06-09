@@ -129,11 +129,20 @@ export interface DocumentSearchResponse {
   results: DocumentSearchResult[];
 }
 
+export interface EditProposal {
+  edit_id: string;
+  document_id: string;
+  original_content: string;
+  proposed_content: string;
+  status: "pending" | "approved" | "rejected";
+}
+
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "summary" | "edit_proposal";
   content: string;
   thinking?: string;
+  thinkingComplete?: boolean;
   status?: string;
   sources?: Array<{
     chunk_id: string;
@@ -141,5 +150,6 @@ export interface ChatMessage {
     page_number: number | null;
     score: number;
   }>;
+  editProposal?: EditProposal;
   timestamp: Date;
 }

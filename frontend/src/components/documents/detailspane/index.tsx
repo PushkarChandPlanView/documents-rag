@@ -15,12 +15,15 @@ import {
   Info,
   Link,
   Refresh,
+  History
 } from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { ComplianceTab } from "@/components/compliance/ComplianceTab";
+import { EditHistoryList } from "./EditHistoryList";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { useReprocessDocument } from "@/hooks/useDocuments";
+import { useDocumentEdits } from "@/hooks/useEdits";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
 import { NameField } from "./NameField";
 import { IMAGE_MIMES } from "@/constants";
@@ -73,7 +76,7 @@ const ChatFill = styled.div`
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export type DetailTab = "details" | "preview" | "chat" | "compliance";
+export type DetailTab = "details" | "preview" | "chat" | "compliance" | "history";
 
 interface ItemDetailsPaneProps {
   item: UnifiedItem;
@@ -94,11 +97,16 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
   const canChat = !!doc && doc.status === "COMPLETED";
   const canReprocess = !!doc && (doc.status === "FAILED" || doc.status === "PROCESSING");
   const { mutate: reprocess, isPending: reprocessing } = useReprocessDocument();
+  const { data: editsData } = useDocumentEdits(doc?.id);
+  const currentVersion = editsData?.edits
+    .filter((e) => e.status === "approved" && e.version != null)
+    .reduce((max, e) => Math.max(max, e.version!), 0) || null;
 
   const tabs = [
     { id: "details", label: "Details", icon: <Info /> },
     ...(canChat ? [{ id: "chat", label: "Chat", icon: <AiAnvi color="anvi" /> }] : []),
     ...(canChat ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle /> }] : []),
+    ...(canChat ? [{ id: "history", label: "History", icon: <History /> }] : []),
   ];
 
   const getSelection = (item: UnifiedItem) => {
@@ -165,6 +173,13 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
                   <MetaLabel>Status</MetaLabel>
                   <MetaValue>{doc.status}</MetaValue>
 
+                  {currentVersion != null && (
+                    <>
+                      <MetaLabel>Version</MetaLabel>
+                      <MetaValue>v{currentVersion}</MetaValue>
+                    </>
+                  )}
+
                   {canReprocess && (
                     <>
                       <MetaLabel />
@@ -220,6 +235,12 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
       {activeTab === "compliance" && canChat && (
         <ChatFill>
           <ComplianceTab documentId={doc!.id} />
+        </ChatFill>
+      )}
+
+      {activeTab === "history" && canChat && (
+        <ChatFill>
+          <EditHistoryList documentId={doc!.id} />
         </ChatFill>
       )}
     </DetailsPanel>

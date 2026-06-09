@@ -8,7 +8,7 @@ from sqlalchemy import select
 from config import get_settings
 from dependencies import AsyncSessionLocal, engine
 from models.user import User
-from routers import auth, chat, compliance, documents, folders, health, search
+from routers import auth, chat, compliance, documents, edits, folders, health, search
 from services import auth_service, kafka_producer, storage_service
 from services.seed_compliance import seed_compliance_rules
 
@@ -79,3 +79,4 @@ app.include_router(folders.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(compliance.router, prefix="/api")
+app.include_router(edits.router, prefix="/api")

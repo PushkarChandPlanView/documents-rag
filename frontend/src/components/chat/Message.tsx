@@ -1,7 +1,9 @@
 import styled from "styled-components";
 import type { ChatMessage } from "@/types";
-import { borderRadius, color, shadow, spacing, text } from "@planview/pv-utilities";
+import { align, anvi, borderRadius, color, shadow, spacing, text } from "@planview/pv-utilities";
 import { AssistantMarkdown } from "./AssistantMarkdown";
+import { EditProposalCard } from "./EditProposalCard";
+import { AiAnvi } from "@planview/pv-icons";
 
 const MessageRow = styled.div<{ $isUser: boolean }>`
   display: flex;
@@ -9,18 +11,24 @@ const MessageRow = styled.div<{ $isUser: boolean }>`
   margin-bottom: ${spacing.small}px;
 `;
 
-const Bubble = styled.div<{ $isUser: boolean }>`
-  max-width: 75%;
-  padding: ${spacing.small}px ${spacing.medium}px;
+const Bubble = styled.div<{ $isUser: boolean; isSummary: boolean }>`
+  max-width: 85%;
+  padding: ${spacing.small}px ${spacing.small}px;
   border-radius: 12px;
-  background: ${({ $isUser }) => ($isUser ? color.backgroundPrimary : color.backgroundNeutral0)};
-  color: ${({ $isUser }) => ($isUser ? color.textInverse : color.textPrimary)};
-  ${shadow.small};
-  ${text.regular};
+  background: ${({ $isUser, isSummary }) =>
+    $isUser ? color.backgroundPrimary : isSummary ? color.backgroundNeutral0 : color.backgroundNeutral0};
+  color: ${({ $isUser, isSummary }) =>
+    $isUser ? color.textInverse : isSummary ? color.textPrimary : color.textPrimary};
+  ${shadow.regular};
+  ${text.small};
   line-height: 1.6;
+  ${(props) => props.isSummary && anvi.border};
 `;
 
-const UserText = styled.p`margin: 0; white-space: pre-wrap;`;
+const UserText = styled.p`
+  margin: 0;
+  white-space: pre-wrap;
+`;
 
 const StatusText = styled.p`
   margin: 0;
@@ -41,8 +49,13 @@ const StatusText = styled.p`
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 `;
 
@@ -116,33 +129,66 @@ const ThinkingContent = styled.div`
   overflow-y: auto;
 `;
 
+const BubbleHeader=styled.div`
+  ${align.centerV};
+`;
+
 export function Message({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
+
+  if (msg.role === "edit_proposal") {
+    return (
+      <MessageRow $isUser={false}>
+        <AssistantColumn>
+          {msg.status && !msg.editProposal ? (
+            <Bubble $isUser={false} isSummary={false}>
+              <StatusText>{msg.status}</StatusText>
+            </Bubble>
+          ) : msg.editProposal ? (
+            <EditProposalCard
+              documentId={msg.editProposal.document_id}
+              editId={msg.editProposal.edit_id}
+              instruction={msg.content}
+
+              proposedContent={msg.editProposal.proposed_content}
+              initialStatus={msg.editProposal.status}
+            />
+          ) : null}
+        </AssistantColumn>
+      </MessageRow>
+    );
+  }
+
   return (
     <MessageRow $isUser={isUser}>
       {isUser ? (
-        <Bubble $isUser>
+        <Bubble $isUser isSummary={false}>
           <UserText>{msg.content}</UserText>
         </Bubble>
       ) : (
         <AssistantColumn>
-          {msg.thinking && (
-            <ThinkingBlock>
+          {msg.thinking && msg.thinkingComplete && (
+            <ThinkingBlock open>
               <ThinkingSummary>Thinking…</ThinkingSummary>
               <ThinkingContent>{msg.thinking}</ThinkingContent>
             </ThinkingBlock>
           )}
-          <Bubble $isUser={false}>
-            {msg.status && !msg.content
-              ? <StatusText>{msg.status}</StatusText>
-              : <AssistantMarkdown content={msg.content} />
-            }
+          <Bubble $isUser={false} isSummary={msg.role === "summary"}>
+            {msg.role === "summary" ? <BubbleHeader>
+              <AiAnvi color="anvi"/> <h3>Document Summary</h3>
+            </BubbleHeader> : null}
+            {msg.status && !msg.content ? (
+              <StatusText>{msg.status}</StatusText>
+            ) : (
+              <AssistantMarkdown content={msg.content} />
+            )}
             {msg.sources && msg.sources.length > 0 && (
               <SourcesSection>
                 <SourcesLabel>Sources:</SourcesLabel>
                 {msg.sources.map((s, i) => (
                   <SourceChip key={i}>
-                    doc:{s.document_id.slice(0, 8)}{s.page_number ? ` p.${s.page_number}` : ""}
+                    doc:{s.document_id.slice(0, 8)}
+                    {s.page_number ? ` p.${s.page_number}` : ""}
                   </SourceChip>
                 ))}
               </SourcesSection>

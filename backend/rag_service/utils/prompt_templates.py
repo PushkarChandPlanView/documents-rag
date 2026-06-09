@@ -31,3 +31,19 @@ Document excerpts:
 {context}
 
 Relevant information:"""
+
+
+EDIT_PROMPT = """You are a precise document editor. Apply the requested change to the document below.
+
+Rules:
+- Apply ONLY the requested change. Do not alter any other part of the document.
+- Preserve all formatting, section headings, paragraph structure, and punctuation exactly.
+- Do not add commentary, preamble, or explanation — return only the full modified document text.
+- If the requested change cannot be applied (e.g., the referenced section does not exist), return the document unchanged.
+
+Document:
+{document_text}
+
+Requested change: {instruction}
+
+Modified document:"""
