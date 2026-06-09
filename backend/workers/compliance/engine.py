@@ -19,7 +19,10 @@ from typing import Optional
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import get_settings
 from shared.providers import llm_factory
+
+settings = get_settings()
 
 from .rules.age_limit_days import AgeLimitDaysChecker
 from .rules.base import ChunkMeta, Location, RuleChecker, RuleResult

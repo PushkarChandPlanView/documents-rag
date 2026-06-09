@@ -360,7 +360,7 @@ services:
         condition: service_completed_successfully
     networks: [internal]
     deploy:
-      replicas: 1
+      replicas: 0
       resources:
         limits:
           cpus: "1.0"
