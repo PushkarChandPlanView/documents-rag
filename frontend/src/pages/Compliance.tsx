@@ -2,7 +2,6 @@ import { useState } from "react";
 import styled from "styled-components";
 import { RulesManagement } from "@/components/compliance/RulesManagement";
 import { useAuthStore } from "@/store/authStore";
-import Layout from "@/components/layout/Layout";
 import { ComplianceToolbar } from "@/components/compliance/toolbar";
 import { useUpdateRule } from "@/hooks/useCompliance";
 
@@ -37,7 +36,6 @@ export function Compliance() {
   }
 
   return (
-    
       <PageWrapper>
         <ComplianceToolbar
           isAdmin={isAdmin}

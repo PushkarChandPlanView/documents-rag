@@ -1,4 +1,3 @@
-import React from "react";
 import { ComboboxOption } from "@planview/pv-uikit";
 import { SOURCE_ICON, SOURCE_HEADER } from "./constants";
 import { TextField, SelectField, TextAreaField } from "./FormFields";

@@ -1,6 +1,5 @@
 import { Combobox, Field, Input, Textarea } from "@planview/pv-form";
 import { ComboboxOption } from "@planview/pv-uikit";
-import React from "react";
 
 const fieldId = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 

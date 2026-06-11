@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import styled from "styled-components";
 import { ContentLayout } from "@planview/pv-uikit";
-import Layout from "@/components/layout/Layout";
 import { ItemList } from "@/components/documents/ItemList";
 import { DetailsPane } from "@/components/documents/detailspane";
 import { ItemFilters } from "@/components/documents/ItemFilters";

@@ -7,8 +7,18 @@ export const authApi = {
     return res.data;
   },
 
-  register: async (email: string, password: string): Promise<{ id: string; email: string }> => {
-    const res = await apiClient.post("/auth/register", { email, password });
+  register: async (
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+  ): Promise<{ id: string; email: string }> => {
+    const res = await apiClient.post("/auth/register", {
+      email,
+      password,
+      first_name: firstName || null,
+      last_name: lastName || null,
+    });
     return res.data;
   },
 

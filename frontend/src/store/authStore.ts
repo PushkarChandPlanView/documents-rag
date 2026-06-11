@@ -14,6 +14,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   userEmail: string | null;
+  userId: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   setTokens: (access: string, refresh: string, email?: string) => void;
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       userEmail: null,
+      userId: null,
       isAuthenticated: false,
       isAdmin: false,
 
@@ -35,6 +37,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: access,
           refreshToken: refresh,
           userEmail: email ?? null,
+          userId: (payload.sub as string) ?? null,
           isAuthenticated: true,
           isAdmin: Boolean(payload.is_admin),
         });
@@ -45,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           userEmail: null,
+          userId: null,
           isAuthenticated: false,
           isAdmin: false,
         }),
@@ -55,12 +59,14 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         userEmail: state.userEmail,
+        userId: state.userId,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.accessToken) {
           const payload = decodeJwtPayload(state.accessToken);
           state.isAdmin = Boolean(payload.is_admin);
+          state.userId = (payload.sub as string) ?? null;
         }
       },
     }

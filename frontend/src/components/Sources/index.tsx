@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ButtonEmpty, ButtonPrimary, DropdownMenu, ListItem, Modal, MODAL_LARGE,
 } from "@planview/pv-uikit";

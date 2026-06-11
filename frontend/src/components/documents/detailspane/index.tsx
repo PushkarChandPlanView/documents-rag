@@ -19,7 +19,7 @@ import {
   History
 } from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
-import { ChatWindow } from "@/components/chat/ChatWindow";
+import { ChatTab } from "./ChatTab";
 import { ComplianceTab } from "@/components/compliance/ComplianceTab";
 import { EditHistoryList } from "./EditHistoryList";
 import { DescriptionEditor } from "./DescriptionEditor";
@@ -96,7 +96,6 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
   const isDoc = item.type === "document";
   const doc = isDoc ? (item as DocumentItem) : null;
   const folder = !isDoc ? (item as FolderItem) : null;
-  const canChat = !!doc && doc.status === "COMPLETED";
   const canReprocess = !!doc && (doc.status === "FAILED" || doc.status === "PROCESSING");
   const { mutate: reprocess, isPending: reprocessing } = useReprocessDocument();
   const { data: editsData } = useDocumentEdits(doc?.id);
@@ -105,11 +104,11 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
     .reduce((max, e) => Math.max(max, e.version!), 0) || null;
 
   const tabs = [
-    { id: "details", label: "Details", icon: <Info /> },
-    ...(canChat ? [{ id: "chat", label: "Chat", icon: <AiAnvi color="anvi" /> }] : []),
-    ...(canChat ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle /> }] : []),
-    ...(canChat ? [{ id: "comments", label: "Comments", icon: <Comment /> }] : []),
-    ...(canChat ? [{ id: "history", label: "History", icon: <History /> }] : []),
+    { id: "details",    label: "Details",    icon: <Info />                    },
+    ...(isDoc ? [{ id: "chat",       label: "Chat",       icon: <AiAnvi color="anvi" /> }] : []),
+    ...(isDoc ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle />     }] : []),
+    ...(isDoc ? [{ id: "comments",   label: "Comments",   icon: <Comment />             }] : []),
+    ...(isDoc ? [{ id: "history",    label: "History",    icon: <History />             }] : []),
   ];
 
   const getSelection = (item: UnifiedItem) => {
@@ -229,24 +228,25 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
         </>
       )}
 
-      {activeTab === "chat" && canChat && (
+      {activeTab === "chat" && isDoc && (
         <ChatFill>
-          <ChatWindow documentId={doc!.id} documentName={doc!.name} />
+          <ChatTab doc={doc!} />
         </ChatFill>
       )}
 
-      {activeTab === "compliance" && canChat && (
+      {activeTab === "compliance" && isDoc && (
         <ChatFill>
           <ComplianceTab documentId={doc!.id} />
         </ChatFill>
       )}
 
-      {activeTab === "history" && canChat && (
+      {activeTab === "history" && isDoc && (
         <ChatFill>
           <EditHistoryList documentId={doc!.id} />
         </ChatFill>
       )}
-        {activeTab === "comments" && canChat && (
+
+      {activeTab === "comments" && isDoc && (
         <ChatFill>
           <CommentsTab documentId={doc!.id} />
         </ChatFill>
