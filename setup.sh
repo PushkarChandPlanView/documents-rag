@@ -259,6 +259,23 @@ wait_healthy elasticsearch    120
 [[ "$APP" == "all" || "$APP" == "agents" ]] && \
   wait_healthy agent_service  60
 
+# ── Seed default users & compliance rules ─────────────────────────────────────
+# Only needed when api_gateway is part of the selected app set.
+# The seed script is idempotent — safe to run on every setup.
+if [[ "$APP" == "all" || "$APP" == "docs" || "$APP" == "search" || "$APP" == "agents" ]]; then
+  header "Seeding default users & compliance rules"
+
+  # Wait until api_gateway has finished its own startup (migrations + MinIO init)
+  log "Running api_gateway seed (admin users + compliance rules)..."
+  if docker compose exec -T api_gateway python seed.py; then
+    success "Default users ready"
+    echo -e "  ${GREEN}admin@example.com${RESET}  / changeme  (primary user)"
+    echo -e "  ${GREEN}admin1@example.com${RESET} / changeme  (service account)"
+  else
+    warn "api_gateway seed failed — run manually: docker compose exec api_gateway python seed.py"
+  fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 header "Setup complete 🎉"
 
@@ -276,9 +293,12 @@ echo -e "  ${GREEN}MinIO Console${RESET}             →  http://localhost:9091"
 echo -e "  ${GREEN}Kafka UI${RESET}                  →  http://localhost:8082"
 
 echo ""
+echo -e "${BOLD}Next steps:${RESET}"
+echo -e "  ${CYAN}Seed test documents (Forge SaaS scenarios):${RESET}"
+echo -e "    python scripts/seed_data.py --wait"
+echo ""
 echo -e "${BOLD}Useful commands:${RESET}"
 echo -e "  make logs svc=api_gateway   # tail logs for a service"
-echo -e "  make seed                   # create test user (admin@example.com / changeme)"
 echo -e "  make shell-api              # shell into api_gateway"
 echo -e "  make shell-db               # psql into postgres"
 echo -e "  make down                   # stop everything"
@@ -286,5 +306,5 @@ echo -e "  make clean                  # nuke containers + volumes"
 
 echo ""
 if [[ "$LLM_PROVIDER" == "bedrock" ]]; then
-  warn "LLM_PROVIDER=bedrock — make sure AWS credentials are set in .env"
+  warn "LLM_PROVIDER=bedrock — make sure AWS credentials are set in .env before running agents"
 fi
