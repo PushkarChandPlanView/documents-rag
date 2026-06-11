@@ -150,6 +150,6 @@ async def search(request: SearchRequest):
                 "file_type": c.file_type,
                 "latency_ms": c.latency_ms,
             }
-            for c in es_chunks
+            for c in chunks
         ],
     }
