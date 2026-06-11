@@ -133,7 +133,7 @@ async def run() -> None:
         async with AsyncSession(engine) as db:
             # Admin user
             try:
-                user = await create_user(db, "admin@example.com", "changeme", is_admin=True)
+                user = await create_user(db, "admin1@example.com", "changeme", is_admin=True)
                 print(f"Created admin user: {user.email}")
             except Exception as e:
                 await db.rollback()

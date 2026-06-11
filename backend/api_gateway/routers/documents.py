@@ -6,13 +6,18 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import Response as FastAPIResponse
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from dependencies import get_current_user, get_db
+from models.document import Item as ItemModel
+from models.edit import DocumentEdit
 from models.user import User
 from schemas.document import DocumentDetailResponse, Item, ItemUpdateRequest, LinkCreateRequest, UnifiedListResponse, UploadResponse
 from services import document_service as item_service, kafka_producer, storage_service
+from services.auth_service import get_user_by_email
 from schemas.kafka_events import DocumentUploadedEvent, LinkAddedEvent, Topics
 
 logger = logging.getLogger(__name__)
@@ -46,6 +51,8 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def upload_document(
     file: UploadFile = File(...),
     folder_id: Optional[UUID] = Form(None),
+    source_type: Optional[str] = Form(None),
+    target_user_email: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -65,9 +72,17 @@ async def upload_document(
             detail=f"File too large. Maximum size: {settings.max_upload_size_mb}MB",
         )
 
+    # Admin override: allow service accounts to upload on behalf of another user.
+    # Only honoured when the requester is an admin and target_user_email resolves.
+    owner_id = current_user.id
+    if target_user_email and getattr(current_user, "is_admin", False):
+        target_user = await get_user_by_email(db, target_user_email)
+        if target_user:
+            owner_id = target_user.id
+
     doc = await item_service.create_document_item(
         db=db,
-        user_id=current_user.id,
+        user_id=owner_id,
         filename=file.filename or "document",
         minio_key="",
         mime_type=file.content_type,
@@ -75,7 +90,7 @@ async def upload_document(
         parent_id=folder_id,
     )
 
-    minio_key = storage_service.raw_object_key(current_user.id, doc.id, file.filename or "document")
+    minio_key = storage_service.raw_object_key(owner_id, doc.id, file.filename or "document")
     storage_service.upload_file(
         file_data=file_bytes,
         bucket=settings.minio_bucket_raw,
@@ -85,11 +100,12 @@ async def upload_document(
 
     doc.minio_key = minio_key
     doc.status = "PROCESSING"
+    doc.source_type = source_type or "upload"
     await db.commit()
 
     event = DocumentUploadedEvent(
         document_id=doc.id,
-        user_id=current_user.id,
+        user_id=owner_id,
         minio_key=minio_key,
         filename=doc.name,
         mime_type=file.content_type,
@@ -101,7 +117,8 @@ async def upload_document(
         payload=event.to_json(),
         key=str(doc.id),
     )
-    logger.info("Document uploaded: document_id=%s user_id=%s", doc.id, current_user.id)
+    logger.info("Document uploaded: document_id=%s user_id=%s (requester=%s)",
+                doc.id, owner_id, current_user.id)
 
     return UploadResponse(
         document_id=doc.id,
@@ -124,6 +141,8 @@ async def add_link(
         title=body.title,
         parent_id=body.folder_id,
     )
+    doc.source_type = body.source_type or "url"
+    await db.flush()
 
     event = LinkAddedEvent(
         document_id=doc.id,
@@ -229,17 +248,18 @@ async def stream_document_file(
     current_user: User = Depends(get_current_user),
 ):
     """Stream the raw file bytes for preview or download."""
-    from fastapi.responses import Response as FastAPIResponse
     item = await item_service.get_item(db, document_id, current_user.id)
+    # Admin fallback: admins can preview documents owned by any user
+    if not item and getattr(current_user, "is_admin", False):
+        result = await db.execute(sa_select(ItemModel).where(ItemModel.id == document_id))
+        item = result.scalar_one_or_none()
     if not item or item.type != "document":
         raise HTTPException(status_code=404, detail="Document not found")
     if not item.minio_key:
         raise HTTPException(status_code=400, detail="This document has no file (web link only)")
 
     # If the document has approved edits, serve the updated processed text
-    # instead of the original raw file so the download reflects current content.
-    from sqlalchemy import select as sa_select
-    from models.edit import DocumentEdit
+    # instead of the original raw file so the preview reflects current content.
     approved_edit = (await db.execute(
         sa_select(DocumentEdit)
         .where(DocumentEdit.document_id == document_id, DocumentEdit.status == "approved")
@@ -251,11 +271,14 @@ async def stream_document_file(
         text_key = f"{document_id}/text.txt"
         try:
             file_bytes = storage_service.download_file(settings.minio_bucket_processed, text_key)
+            mime = "text/plain"
+            base_name = (item.name or "document").rsplit(".", 1)[0]
+            filename = f"{base_name}_edited.txt"
         except Exception:
+            # Processed file unavailable — fall back to the raw original
             file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
-        mime = "text/plain"
-        base_name = (item.name or "document").rsplit(".", 1)[0]
-        filename = f"{base_name}_edited.txt"
+            mime = item.mime_type or "application/octet-stream"
+            filename = (item.name or "file").replace('"', "")
     else:
         file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
         mime = item.mime_type or "application/octet-stream"
@@ -268,6 +291,61 @@ async def stream_document_file(
             "Content-Disposition": f'inline; filename="{filename}"',
             "Content-Length": str(len(file_bytes)),
             "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream the raw file bytes directly to the client."""
+    item = await item_service.get_item(db, document_id, current_user.id)
+    # Admin fallback: admins can download documents owned by any user
+    if not item and getattr(current_user, "is_admin", False):
+        result = await db.execute(sa_select(ItemModel).where(ItemModel.id == document_id))
+        item = result.scalar_one_or_none()
+    if not item or item.type != "document":
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not item.minio_key:
+        raise HTTPException(status_code=404, detail="File not available")
+
+    # Check for approved edits — serve the edited version so download matches what the user approved.
+    approved_edit = (await db.execute(
+        sa_select(DocumentEdit)
+        .where(DocumentEdit.document_id == document_id, DocumentEdit.status == "approved")
+        .order_by(DocumentEdit.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if approved_edit:
+        text_key = f"{document_id}/text.txt"
+        try:
+            data = storage_service.download_file(settings.minio_bucket_processed, text_key)
+            mime = "text/plain"
+            base_name = (item.name or "document").rsplit(".", 1)[0]
+            filename = f"{base_name}_edited.txt"
+        except Exception:
+            # Processed file unavailable — fall back to the raw original
+            data = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+            mime = item.mime_type or "application/octet-stream"
+            filename = item.name or "document"
+    else:
+        try:
+            data = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=f"File not found in storage: {exc}")
+        mime = item.mime_type or "application/octet-stream"
+        filename = item.name or "document"
+
+    return FastAPIResponse(
+        content=data,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(data)),
         },
     )
 

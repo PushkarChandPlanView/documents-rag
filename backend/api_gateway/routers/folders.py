@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from models.user import User
 from schemas.document import Item, ItemUpdateRequest
 from schemas.folder import FolderCreate, FolderListResponse
 from services import document_service as item_service
+from services.auth_service import get_user_by_email
 
 logger = logging.getLogger(__name__)
 
@@ -24,29 +25,44 @@ class BreadcrumbResponse(BaseModel):
 @router.post("", response_model=Item, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     body: FolderCreate,
+    target_user_email: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Admin override: service accounts can create folders on behalf of another user.
+    owner_id = current_user.id
+    if target_user_email and getattr(current_user, "is_admin", False):
+        target_user = await get_user_by_email(db, target_user_email)
+        if target_user:
+            owner_id = target_user.id
     try:
         folder = await item_service.create_folder_item(
             db=db,
-            user_id=current_user.id,
+            user_id=owner_id,
             name=body.name,
             parent_id=body.parent_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    logger.info("Folder created: folder_id=%s user_id=%s", folder.id, current_user.id)
+    logger.info("Folder created: folder_id=%s user_id=%s (requester=%s)",
+                folder.id, owner_id, current_user.id)
     return item_service._to_item(folder)
 
 
 @router.get("", response_model=FolderListResponse)
 async def list_folders(
     parent_id: Optional[UUID] = None,
+    target_user_email: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    folders = await item_service.list_folders(db, current_user.id, parent_id=parent_id)
+    # Admin override: allow listing another user's folders (used by agent_service).
+    owner_id = current_user.id
+    if target_user_email and getattr(current_user, "is_admin", False):
+        target_user = await get_user_by_email(db, target_user_email)
+        if target_user:
+            owner_id = target_user.id
+    folders = await item_service.list_folders(db, owner_id, parent_id=parent_id)
     items = [item_service._to_item(f) for f in folders]
     return FolderListResponse(items=items, total=len(items))
 

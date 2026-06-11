@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Builder · documents-rag</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f8f9fa; }
+    .navbar-brand { font-weight: 700; letter-spacing: -.5px; }
+
+    /* Agent cards */
+    .agent-card { transition: box-shadow .15s; }
+    .agent-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+    .format-badge { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Run panel */
+    #run-panel { display: none; }
+    .step-item { display: flex; align-items: flex-start; gap: .6rem; padding: .4rem 0;
+                 border-bottom: 1px solid #e9ecef; font-size: .875rem; }
+    .step-check { font-size: 1rem; min-width: 1.4rem; }
+    #answer-box { white-space: pre-wrap; font-size: .875rem; line-height: 1.6;
+                  background: #fff; border: 1px solid #dee2e6; border-radius: .4rem;
+                  padding: 1rem; max-height: 400px; overflow-y: auto; }
+
+    /* Activity log */
+    #activity-log { font-family: monospace; font-size: .78rem; background: #1e1e1e;
+                    color: #d4d4d4; border-radius: .4rem; padding: .75rem 1rem;
+                    max-height: 200px; overflow-y: auto; }
+    #activity-log .log-line  { margin:0; padding:.1rem 0; border-bottom:1px solid #2d2d2d; }
+    #activity-log .log-ts    { color:#6a9955; margin-right:.5rem; }
+    #activity-log .log-plan  { color:#9cdcfe; }
+    #activity-log .log-step  { color:#dcdcaa; }
+    #activity-log .log-gen   { color:#c586c0; }
+    #activity-log .log-upload { color:#4ec9b0; }
+    #activity-log .log-done  { color:#4ec9b0; font-weight:bold; }
+    #activity-log .log-error { color:#f44747; font-weight:bold; }
+    #activity-log .log-dim   { color:#808080; }
+
+    /* Runs history panel */
+    #runs-panel { display: none; }
+    .run-row { cursor: pointer; border-bottom: 1px solid #e9ecef; padding: .5rem .75rem;
+               font-size: .85rem; transition: background .1s; }
+    .run-row:hover { background: #f0f4ff; }
+    .run-row.active { background: #e7f0ff; border-left: 3px solid #0d6efd; }
+    .run-status { font-size: .72rem; font-weight: 600; text-transform: uppercase;
+                  letter-spacing: .05em; padding: .2rem .5rem; border-radius: 999px; }
+    .status-running   { background:#fff3cd; color:#664d03; }
+    .status-completed { background:#d1e7dd; color:#0a3622; }
+    .status-failed    { background:#f8d7da; color:#58151c; }
+
+    /* Run detail pane */
+    #run-detail { display: none; }
+    .detail-plan-step { padding: .3rem 0; font-size: .85rem; border-bottom: 1px solid #e9ecef; }
+
+    #toast-wrap { position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3 mb-4">
+  <a class="navbar-brand" href="/agents">🤖 Agent Builder</a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/search" class="btn btn-sm btn-outline-light">Search</a>
+    <a href="/ingest" class="btn btn-sm btn-outline-light">Ingest</a>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 1080px;">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h5 class="fw-bold mb-0">Saved Agents</h5>
+      <p class="text-muted mb-0" style="font-size:.85rem">
+        Create reusable agents with a system prompt, output format, and search tools.
+      </p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openCreateDrawer()">+ New Agent</button>
+  </div>
+
+  <!-- User ID -->
+  <div class="mb-3 d-flex align-items-center gap-2" style="max-width:340px;">
+    <label class="form-label mb-0 text-nowrap" style="font-size:.8rem;">User ID:</label>
+    <input id="userId" type="text" class="form-control form-control-sm"
+           value="admin@example.com" placeholder="user@example.com" />
+  </div>
+
+  <!-- Agent cards -->
+  <div id="agent-list" class="row g-3 mb-4">
+    <p class="text-muted text-center py-4">Loading agents…</p>
+  </div>
+
+  <!-- ── Run Panel ─────────────────────────────────────────────────────────── -->
+  <div id="run-panel" class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <span class="fw-semibold" id="run-agent-name">Run: —</span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="openRunsPanel(_runningAgentId)">📋 History</button>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="closeRunPanel()">✕ Close</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="input-group mb-3">
+        <input id="run-query" type="text" class="form-control"
+               placeholder="What do you want to research?" />
+        <button class="btn btn-success" id="run-btn" onclick="startRun()">▶ Run</button>
+      </div>
+
+      <!-- Activity log -->
+      <div id="log-section" style="display:none" class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <h6 class="fw-semibold mb-0" style="font-size:.85rem;">🖥 Activity Log</h6>
+          <button class="btn btn-sm btn-link p-0 text-muted" onclick="clearLog()">Clear</button>
+        </div>
+        <div id="activity-log"></div>
+      </div>
+
+      <!-- Plan checklist -->
+      <div id="plan-section" style="display:none" class="mb-3">
+        <h6 class="fw-semibold mb-2">📋 Plan</h6>
+        <div id="plan-list"></div>
+      </div>
+
+      <!-- Answer -->
+      <div id="answer-section" style="display:none">
+        <h6 class="fw-semibold mb-2">📝 Answer</h6>
+        <div id="answer-box"></div>
+        <div id="upload-notice" class="mt-2 text-success fw-semibold"
+             style="display:none; font-size:.85rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Runs History Panel ─────────────────────────────────────────────── -->
+  <div id="runs-panel" class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <span class="fw-semibold" id="runs-panel-title">Run History: —</span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary"
+                onclick="refreshRuns()">↻ Refresh</button>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="closeRunsPanel()">✕ Close</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="row g-0" style="min-height:320px;">
+
+        <!-- Left: run list -->
+        <div class="col-md-5 border-end" style="overflow-y:auto; max-height:520px;">
+          <div id="runs-list">
+            <p class="text-muted text-center py-4" style="font-size:.85rem;">Loading…</p>
+          </div>
+        </div>
+
+        <!-- Right: run detail -->
+        <div class="col-md-7 p-3" id="run-detail-pane">
+          <p class="text-muted text-center mt-4" style="font-size:.85rem;">
+            ← Select a run to see details
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Create / Edit Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="agentDrawer" style="width:460px;">
+  <div class="offcanvas-header border-bottom">
+    <h5 class="offcanvas-title" id="drawer-title">New Agent</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="agent-form">
+      <input type="hidden" id="edit-agent-id" value="" />
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Name *</label>
+        <input id="f-name" class="form-control form-control-sm"
+               placeholder="Jira + Confluence researcher" required />
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Description</label>
+        <input id="f-desc" class="form-control form-control-sm"
+               placeholder="What this agent does…" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">System Prompt *</label>
+        <textarea id="f-prompt" class="form-control" rows="6"
+          placeholder="You are an expert technical writer…" required></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Output Format</label>
+        <div class="d-flex gap-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="output_format"
+                   id="fmt-md" value="markdown" checked />
+            <label class="form-check-label" for="fmt-md">Markdown</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="output_format"
+                   id="fmt-txt" value="text" />
+            <label class="form-check-label" for="fmt-txt">Plain Text</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="output_format"
+                   id="fmt-json" value="json" />
+            <label class="form-check-label" for="fmt-json">JSON</label>
+          </div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Tools</label>
+        <div class="d-flex flex-wrap gap-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_all" checked />
+            <label class="form-check-label">All sources</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_jira" />
+            <label class="form-check-label">Jira</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_confluence" />
+            <label class="form-check-label">Confluence</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_slack" />
+            <label class="form-check-label">Slack</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_github" />
+            <label class="form-check-label">GitHub</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tools"
+                   value="search_hubspot" />
+            <label class="form-check-label">HubSpot</label>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm w-100">Save Agent</button>
+    </form>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-wrap">
+  <div id="toast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body fw-semibold" id="toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto"
+              data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── Globals ───────────────────────────────────────────────────────────────────
+const _agents       = {};          // id → agent object
+let   _runningAgentId  = null;     // agent currently in the run panel
+let   _runsAgentId     = null;     // agent currently in the runs panel
+let   _selectedRunId   = null;     // run selected in left pane
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function showToast(msg, ok) {
+  const el = document.getElementById('toast');
+  el.classList.remove('text-bg-success','text-bg-danger');
+  el.classList.add(ok ? 'text-bg-success' : 'text-bg-danger');
+  document.getElementById('toast-body').textContent = msg;
+  bootstrap.Toast.getOrCreateInstance(el, { delay: 4000 }).show();
+}
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function userId() {
+  return document.getElementById('userId').value.trim() || 'admin@example.com';
+}
+function nowTs() { return new Date().toTimeString().slice(0,8); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toTimeString().slice(0,8);
+}
+function fmtDuration(start, end) {
+  if (!start || !end) return null;
+  const s = Math.round((new Date(end) - new Date(start)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+}
+
+const FORMAT_COLORS = { markdown:'bg-primary', text:'bg-secondary', json:'bg-warning text-dark' };
+const STATUS_CSS    = { running:'status-running', completed:'status-completed', failed:'status-failed' };
+const STATUS_ICON   = { running:'⏳', completed:'✅', failed:'❌' };
+
+// ── Load agents ───────────────────────────────────────────────────────────────
+async function loadAgents() {
+  const el = document.getElementById('agent-list');
+  el.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+  try {
+    const res  = await fetch('/agent-ui/api/agents');
+    const data = await res.json();
+    if (!res.ok) { el.innerHTML = `<p class="text-danger">${data.error||'Failed'}</p>`; return; }
+    if (!data.length) {
+      el.innerHTML = '<p class="text-muted text-center py-4">No agents yet. Click <strong>+ New Agent</strong> to create one.</p>';
+      return;
+    }
+    data.forEach(a => { _agents[a.id] = a; });
+    console.log('[loadAgents] registry:', Object.keys(_agents));
+    el.innerHTML = data.map(a => `
+      <div class="col-md-6 col-lg-4">
+        <div class="card agent-card h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <h6 class="mb-0 fw-bold">${escHtml(a.name)}</h6>
+              <span class="badge format-badge ${FORMAT_COLORS[a.output_format]||'bg-secondary'}">
+                ${escHtml(a.output_format)}
+              </span>
+            </div>
+            ${a.description
+              ? `<p class="text-muted mb-2" style="font-size:.8rem">${escHtml(a.description)}</p>`
+              : ''}
+            <div style="font-size:.75rem;color:#6c757d;">
+              Tools: ${escHtml((a.tools||[]).join(', '))}
+            </div>
+          </div>
+          <div class="card-footer bg-transparent d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-success flex-fill"
+                    onclick="openRunPanel('${a.id}')">▶ Run</button>
+            <button class="btn btn-sm btn-outline-info"
+                    onclick="openRunsPanel('${a.id}')">📋 Runs</button>
+            <button class="btn btn-sm btn-outline-primary"
+                    onclick="openEditDrawer('${a.id}')">Edit</button>
+            <button class="btn btn-sm btn-outline-danger"
+                    onclick="deleteAgent('${a.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = `<p class="text-danger">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+document.getElementById('userId').addEventListener('change', loadAgents);
+loadAgents();
+
+// ── Create / Edit drawer ──────────────────────────────────────────────────────
+const _drawer = new bootstrap.Offcanvas(document.getElementById('agentDrawer'));
+
+function openCreateDrawer() {
+  document.getElementById('drawer-title').textContent = 'New Agent';
+  document.getElementById('edit-agent-id').value = '';
+  document.getElementById('agent-form').reset();
+  _drawer.show();
+}
+
+function openEditDrawer(agentId) {
+  const a = _agents[agentId];
+  if (!a) { showToast('Agent not found — reload the page.', false); return; }
+  document.getElementById('drawer-title').textContent = 'Edit Agent';
+  document.getElementById('edit-agent-id').value  = a.id;
+  document.getElementById('f-name').value          = a.name || '';
+  document.getElementById('f-desc').value          = a.description || '';
+  document.getElementById('f-prompt').value        = a.system_prompt || '';
+  const fmtEl = document.querySelector(`input[name="output_format"][value="${a.output_format||'markdown'}"]`);
+  if (fmtEl) fmtEl.checked = true;
+  document.querySelectorAll('input[name="tools"]').forEach(cb => {
+    cb.checked = (a.tools||[]).includes(cb.value);
+  });
+  _drawer.show();
+}
+
+document.getElementById('agent-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const agentId = document.getElementById('edit-agent-id').value;
+  const tools   = [...document.querySelectorAll('input[name="tools"]:checked')].map(c => c.value);
+  if (!tools.length) { showToast('Select at least one tool.', false); return; }
+  const payload = {
+    user_id:       userId(),
+    name:          document.getElementById('f-name').value.trim(),
+    description:   document.getElementById('f-desc').value.trim() || null,
+    system_prompt: document.getElementById('f-prompt').value.trim(),
+    output_format: document.querySelector('input[name="output_format"]:checked').value,
+    tools,
+  };
+  try {
+    const res  = await fetch(
+      agentId ? `/agent-ui/api/agents/${agentId}` : '/agent-ui/api/agents',
+      { method: agentId ? 'PATCH' : 'POST',
+        headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+    );
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`✓ Agent ${agentId ? 'updated' : 'created'}`, true);
+      _drawer.hide(); loadAgents();
+    } else {
+      showToast('Error: ' + (data.detail || data.error || res.statusText), false);
+    }
+  } catch (err) { showToast('Request failed: ' + err.message, false); }
+});
+
+async function deleteAgent(id) {
+  if (!confirm('Delete this agent and all its run history?')) return;
+  try {
+    const res = await fetch(`/agent-ui/api/agents/${id}`, { method:'DELETE' });
+    if (res.ok) { showToast('✓ Agent deleted', true); delete _agents[id]; loadAgents(); }
+    else { const d = await res.json(); showToast('Error: '+(d.error||d.detail), false); }
+  } catch (err) { showToast('Request failed: '+err.message, false); }
+}
+
+// ── Run panel ─────────────────────────────────────────────────────────────────
+function openRunPanel(agentId) {
+  console.log('[openRunPanel] id:', agentId, '| registry keys:', Object.keys(_agents));
+  const a = _agents[agentId];
+  if (!a) {
+    showToast('Agent not found — reloading…', false);
+    loadAgents().then(() => { if (_agents[agentId]) openRunPanel(agentId); });
+    return;
+  }
+  _runningAgentId = agentId;
+  document.getElementById('run-agent-name').textContent = `Run: ${a.name}`;
+  document.getElementById('run-query').value = '';
+  document.getElementById('log-section').style.display    = 'none';
+  document.getElementById('plan-section').style.display   = 'none';
+  document.getElementById('answer-section').style.display = 'none';
+  document.getElementById('activity-log').innerHTML = '';
+  document.getElementById('plan-list').innerHTML    = '';
+  document.getElementById('answer-box').textContent = '';
+  document.getElementById('upload-notice').style.display = 'none';
+  document.getElementById('run-panel').style.display = 'block';
+  document.getElementById('run-panel').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('run-query').focus();
+}
+
+function closeRunPanel() {
+  document.getElementById('run-panel').style.display = 'none';
+  _runningAgentId = null;
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────────
+function logLine(text, cls='') {
+  const box = document.getElementById('activity-log');
+  const p   = document.createElement('p');
+  p.className = 'log-line';
+  p.innerHTML = `<span class="log-ts">${nowTs()}</span><span class="${cls}">${escHtml(text)}</span>`;
+  box.appendChild(p);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() { document.getElementById('activity-log').innerHTML = ''; }
+
+// ── Start run ─────────────────────────────────────────────────────────────────
+let _tokenCount = 0;
+
+async function startRun() {
+  if (!_runningAgentId) return;
+  const query = document.getElementById('run-query').value.trim();
+  if (!query) { document.getElementById('run-query').focus(); return; }
+
+  const btn   = document.getElementById('run-btn');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Running…';
+  _tokenCount     = 0;
+
+  document.getElementById('log-section').style.display    = 'block';
+  document.getElementById('plan-section').style.display   = 'none';
+  document.getElementById('answer-section').style.display = 'none';
+  document.getElementById('activity-log').innerHTML = '';
+  document.getElementById('plan-list').innerHTML    = '';
+  document.getElementById('answer-box').textContent = '';
+  document.getElementById('upload-notice').style.display = 'none';
+
+  logLine(`Starting: "${query}"`, 'log-plan');
+
+  try {
+    const res = await fetch(`/agent-ui/api/agents/${_runningAgentId}/run`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query, user_id: userId() }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      logLine('HTTP error: '+(err.error||res.statusText), 'log-error');
+      showToast('Run failed', false);
+      return;
+    }
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream:true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try { handleSSE(JSON.parse(line.slice(6))); } catch {}
+      }
+    }
+  } catch (err) {
+    logLine('Stream error: '+err.message, 'log-error');
+    showToast('Stream error: '+err.message, false);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '▶ Run';
+  }
+}
+
+let _planSteps = [];
+function handleSSE(ev) {
+  switch (ev.type) {
+    case 'plan':
+      _planSteps = ev.steps || [];
+      logLine(`Plan: ${_planSteps.length} step(s)`, 'log-plan');
+      _planSteps.forEach((s,i) => logLine(`  ${i+1}. ${s}`, 'log-step'));
+      document.getElementById('plan-section').style.display = 'block';
+      document.getElementById('plan-list').innerHTML = _planSteps.map((s,i) => `
+        <div class="step-item" id="step-${i}">
+          <span class="step-check" id="step-check-${i}">⬜</span>
+          <span>${escHtml(s)}</span>
+        </div>`).join('');
+      break;
+
+    case 'step_done': {
+      const src = ev.source_types ? ` [${ev.source_types.join('+')}]` : ' [all]';
+      logLine(`Step ${ev.step+1} done${src} — ${ev.chunks_found} chunks`, 'log-step');
+      const chk = document.getElementById(`step-check-${ev.step}`);
+      if (chk) chk.textContent = '✅';
+      const row = document.getElementById(`step-${ev.step}`);
+      if (row) {
+        const s = document.createElement('span');
+        s.style.cssText = 'font-size:.72rem;color:#6c757d;margin-left:.4rem;';
+        s.textContent = `(${ev.chunks_found} chunks)`;
+        row.appendChild(s);
+      }
+      break;
+    }
+
+    case 'generating':
+      logLine('Synthesizing answer…', 'log-gen');
+      document.getElementById('answer-section').style.display = 'block';
+      document.getElementById('answer-box').textContent = '';
+      _tokenCount = 0;
+      break;
+
+    case 'token': {
+      const box = document.getElementById('answer-box');
+      box.textContent += ev.content || '';
+      box.scrollTop = box.scrollHeight;
+      _tokenCount++;
+      if (_tokenCount % 50 === 0) logLine(`  … ${_tokenCount} tokens`, 'log-dim');
+      break;
+    }
+
+    case 'uploaded':
+      logLine(`Uploaded → ${ev.document_id||'—'}`, 'log-upload');
+      document.getElementById('upload-notice').style.display = 'block';
+      document.getElementById('upload-notice').innerHTML =
+        `✅ Saved as document: <code>${escHtml(ev.document_id||'—')}</code>
+         — <a href="/search-ui/api/documents/${escHtml(ev.document_id||'')}/download"
+              download target="_blank">⬇ Download</a> ·
+         <a href="/search" target="_blank">Search</a> ·
+         <a href="/ingest" target="_blank">Manage</a>`;
+      break;
+
+    case 'done':
+      logLine(`Done. ~${_tokenCount} tokens generated.`, 'log-done');
+      showToast('✓ Run complete', true);
+      // Auto-refresh runs panel if it's open for this agent
+      if (_runsAgentId === _runningAgentId && document.getElementById('runs-panel').style.display === 'block') {
+        setTimeout(() => loadRuns(_runsAgentId), 1000);
+      }
+      break;
+
+    case 'error':
+      logLine('Error: '+(ev.content||'unknown'), 'log-error');
+      showToast('Agent error: '+(ev.content||'unknown'), false);
+      break;
+
+    default:
+      logLine(`[${ev.type}]`, 'log-dim');
+  }
+}
+
+document.getElementById('run-query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startRun();
+});
+
+// ── Runs history panel ────────────────────────────────────────────────────────
+async function openRunsPanel(agentId) {
+  const a = _agents[agentId];
+  if (!a) { showToast('Agent not found', false); return; }
+  _runsAgentId   = agentId;
+  _selectedRunId = null;
+  document.getElementById('runs-panel-title').textContent = `Run History: ${a.name}`;
+  document.getElementById('run-detail-pane').innerHTML =
+    '<p class="text-muted text-center mt-4" style="font-size:.85rem;">← Select a run to see details</p>';
+  document.getElementById('runs-panel').style.display = 'block';
+  document.getElementById('runs-panel').scrollIntoView({ behavior:'smooth' });
+  await loadRuns(agentId);
+}
+
+function closeRunsPanel() {
+  document.getElementById('runs-panel').style.display = 'none';
+  _runsAgentId = null;
+}
+
+async function refreshRuns() {
+  if (_runsAgentId) await loadRuns(_runsAgentId);
+}
+
+async function loadRuns(agentId) {
+  const list = document.getElementById('runs-list');
+  list.innerHTML = '<p class="text-muted text-center py-3" style="font-size:.82rem;">Loading…</p>';
+  try {
+    const res  = await fetch(`/agent-ui/api/agents/${agentId}/runs`);
+    const data = await res.json();
+    if (!res.ok) { list.innerHTML = `<p class="text-danger p-3">${data.error||'Failed'}</p>`; return; }
+    if (!data.length) {
+      list.innerHTML = '<p class="text-muted text-center py-4" style="font-size:.82rem;">No runs yet.<br/>Click ▶ Run to start one.</p>';
+      return;
+    }
+    list.innerHTML = data.map(r => {
+      const statusCls  = STATUS_CSS[r.status]  || 'status-running';
+      const statusIcon = STATUS_ICON[r.status] || '⏳';
+      const dur        = fmtDuration(r.created_at, r.completed_at);
+      return `
+        <div class="run-row ${_selectedRunId === r.id ? 'active' : ''}"
+             id="run-row-${r.id}" onclick="selectRun('${agentId}','${r.id}')">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="run-status ${statusCls}">${statusIcon} ${r.status}</span>
+            ${dur ? `<span style="font-size:.72rem;color:#6c757d;">${dur}</span>` : ''}
+          </div>
+          <div class="text-truncate fw-semibold" style="max-width:100%;"
+               title="${escHtml(r.query)}">${escHtml(r.query)}</div>
+          <div style="font-size:.72rem;color:#6c757d;">${fmtDate(r.created_at)}</div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = `<p class="text-danger p-3">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function selectRun(agentId, runId) {
+  // Highlight selected row
+  document.querySelectorAll('.run-row').forEach(r => r.classList.remove('active'));
+  const row = document.getElementById(`run-row-${runId}`);
+  if (row) row.classList.add('active');
+  _selectedRunId = runId;
+
+  const pane = document.getElementById('run-detail-pane');
+  pane.innerHTML = '<p class="text-muted text-center mt-4" style="font-size:.82rem;">Loading…</p>';
+
+  try {
+    const res  = await fetch(`/agent-ui/api/runs/${runId}`);
+    const r    = await res.json();
+    if (!res.ok) { pane.innerHTML = `<p class="text-danger">${r.error||'Failed'}</p>`; return; }
+
+    const statusCls  = STATUS_CSS[r.status]  || 'status-running';
+    const statusIcon = STATUS_ICON[r.status] || '⏳';
+    const dur        = fmtDuration(r.created_at, r.completed_at);
+
+    const planHtml = r.plan && r.plan.length
+      ? r.plan.map((s, i) => `
+          <div class="detail-plan-step">
+            <span class="text-muted me-2" style="font-size:.75rem;">${i+1}.</span>${escHtml(s)}
+          </div>`).join('')
+      : '<p class="text-muted" style="font-size:.82rem;">No plan recorded.</p>';
+
+    const docHtml = r.result_document_id
+      ? `<div class="mt-2">
+           <span class="badge bg-success me-1">✅ Document created</span>
+           <code style="font-size:.78rem;">${escHtml(r.result_document_id)}</code>
+           <div class="mt-1 d-flex gap-2 flex-wrap" style="font-size:.8rem;">
+             <a href="/search-ui/api/documents/${escHtml(r.result_document_id)}/download"
+                download target="_blank">⬇ Download</a>
+             <a href="/search" target="_blank">🔍 Search</a>
+             <a href="/ingest" target="_blank">🗂 Manage</a>
+           </div>
+         </div>`
+      : '<p class="text-muted mt-2" style="font-size:.82rem;">No result document.</p>';
+
+    pane.innerHTML = `
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="run-status ${statusCls}">${statusIcon} ${r.status}</span>
+        ${dur ? `<span class="text-muted" style="font-size:.78rem;">⏱ ${dur}</span>` : ''}
+        <button class="btn btn-sm btn-outline-success ms-auto"
+                onclick="reRunQuery('${agentId}', ${JSON.stringify(escHtml(r.query))})">
+          ▶ Re-run
+        </button>
+      </div>
+
+      <div class="mb-3">
+        <div class="text-muted mb-1" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Query</div>
+        <div class="fw-semibold" style="font-size:.875rem;">${escHtml(r.query)}</div>
+      </div>
+
+      <div class="mb-1 text-muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Timestamps</div>
+      <div class="mb-3" style="font-size:.8rem;">
+        <div>Started:   ${fmtDate(r.created_at)}</div>
+        <div>Completed: ${fmtDate(r.completed_at)}</div>
+      </div>
+
+      <div class="mb-1 text-muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Plan</div>
+      <div class="mb-3">${planHtml}</div>
+
+      <div class="mb-1 text-muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Result</div>
+      ${docHtml}`;
+  } catch (err) {
+    pane.innerHTML = `<p class="text-danger">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function reRunQuery(agentId, query) {
+  openRunPanel(agentId);
+  document.getElementById('run-query').value = query;
+  startRun();
+}
+</script>
+</body>
+</html>

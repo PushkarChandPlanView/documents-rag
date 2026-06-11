@@ -1,16 +1,20 @@
 import json
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Literal, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from chains import rag_chain
+from chains.agentic_chain import run_agentic_search
 from services import context_builder, llm_client, retriever
+from services import es_retriever
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["query"])
+
+SearchMode = Literal["hybrid", "semantic", "keyword", "pgvector"]
 
 
 class QueryRequest(BaseModel):
@@ -18,6 +22,19 @@ class QueryRequest(BaseModel):
     user_id: str
     document_ids: Optional[list[str]] = None
     conversation_id: Optional[str] = None
+    source_types: Optional[list[str]] = None
+    file_types: Optional[list[str]] = None
+    folder_id: Optional[str] = None
+
+
+class AgenticQueryRequest(BaseModel):
+    query: str
+    user_id: str
+    document_ids: Optional[list[str]] = None
+    max_iter: int = 3
+    source_types: Optional[list[str]] = None
+    file_types: Optional[list[str]] = None
+    folder_id: Optional[str] = None
 
 
 class SearchRequest(BaseModel):
@@ -25,6 +42,10 @@ class SearchRequest(BaseModel):
     user_id: str
     document_ids: Optional[list[str]] = None
     top_k: int = 5
+    mode: SearchMode = "hybrid"  # hybrid | semantic | keyword | pgvector
+    source_types: Optional[list[str]] = None
+    file_types: Optional[list[str]] = None
+    folder_id: Optional[str] = None
 
 
 async def _safe_stream(request: QueryRequest) -> AsyncGenerator[str, None]:
@@ -36,6 +57,9 @@ async def _safe_stream(request: QueryRequest) -> AsyncGenerator[str, None]:
             query=request.query,
             user_id=request.user_id,
             document_ids=request.document_ids,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
         ):
             yield chunk
     except Exception as exc:
@@ -65,18 +89,119 @@ async def query(request: QueryRequest):
     )
 
 
+async def _safe_stream_agentic(request: AgenticQueryRequest) -> AsyncGenerator[str, None]:
+    """Wrap run_agentic_search so any mid-stream exception surfaces as an SSE error."""
+    import json as _json
+    try:
+        async for chunk in run_agentic_search(
+            query=request.query,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            max_iter=request.max_iter,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
+        ):
+            yield chunk
+    except Exception as exc:
+        logger.error("Agentic stream error: %s", exc, exc_info=True)
+        yield (
+            "data: "
+            + _json.dumps({"type": "error", "content": "Agentic search failed.", "sources": [], "done": True})
+            + "\n\n"
+        )
+
+
+@router.post("/agentic-query")
+async def agentic_query(request: AgenticQueryRequest):
+    """Stream agentic RAG answer as SSE (router → search → reflect → generate loop)."""
+    return StreamingResponse(
+        _safe_stream_agentic(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/search")
 async def search(request: SearchRequest):
-    """Semantic search without LLM generation."""
-    query_embedding = await llm_client.embed(request.query)
-    chunks = await retriever.retrieve(
-        query_embedding=query_embedding,
-        user_id=request.user_id,
-        document_ids=request.document_ids,
-        top_k=request.top_k,
-    )
+    """
+    Search document chunks without LLM generation.
+
+    Modes:
+      hybrid   — BM25 + kNN fused with RRF via Elasticsearch (default)
+      semantic — pure kNN via Elasticsearch
+      keyword  — pure BM25 via Elasticsearch
+      pgvector — original pgvector hybrid scoring (fallback / no ES required)
+    """
+    if request.mode == "pgvector":
+        # Original pgvector path — always available as fallback
+        query_embedding = await llm_client.embed(request.query)
+        chunks = await retriever.retrieve(
+            query_embedding=query_embedding,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            query=request.query,
+        )
+        return {
+            "query": request.query,
+            "mode": "pgvector",
+            "results": [
+                {
+                    "chunk_id": c.chunk_id,
+                    "document_id": c.document_id,
+                    "text": c.text,
+                    "score": round(c.score, 4),
+                    "page_number": c.page_number,
+                    "document_name": c.document_name,
+                    "file_type": c.file_type,
+                }
+                for c in chunks
+            ],
+        }
+
+    # Elasticsearch paths
+    if request.mode == "keyword":
+        es_chunks = await es_retriever.keyword_search(
+            query_text=request.query,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
+        )
+    else:
+        # hybrid (default) or semantic both need an embedding
+        query_embedding = await llm_client.embed(request.query)
+        if request.mode == "semantic":
+            es_chunks = await es_retriever.semantic_search(
+                query_vector=query_embedding,
+                user_id=request.user_id,
+                document_ids=request.document_ids,
+                top_k=request.top_k,
+                source_types=request.source_types,
+                file_types=request.file_types,
+                folder_id=request.folder_id,
+            )
+        else:
+            es_chunks = await es_retriever.hybrid_search(
+                query_text=request.query,
+                query_vector=query_embedding,
+                user_id=request.user_id,
+                document_ids=request.document_ids,
+                top_k=request.top_k,
+                source_types=request.source_types,
+                file_types=request.file_types,
+                folder_id=request.folder_id,
+            )
+
     return {
         "query": request.query,
+        "mode": request.mode,
         "results": [
             {
                 "chunk_id": c.chunk_id,
@@ -84,8 +209,10 @@ async def search(request: SearchRequest):
                 "text": c.text,
                 "score": round(c.score, 4),
                 "page_number": c.page_number,
-                "filename": "",  # fetched from PostgreSQL in api_gateway if needed
+                "document_name": c.document_name,
+                "file_type": c.file_type,
+                "latency_ms": c.latency_ms,
             }
-            for c in chunks
+            for c in es_chunks
         ],
     }

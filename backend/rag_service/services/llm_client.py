@@ -61,3 +61,12 @@ async def generate_stream(prompt: str) -> AsyncGenerator[str, None]:
 async def generate(prompt: str) -> str:
     """Non-streaming generation — returns full response string."""
     return await _get_llm_provider().generate(prompt)
+
+
+async def generate_with_model(prompt: str, model_id: str, max_tokens: int = 512) -> str:
+    """Non-streaming generation with an explicit model override (e.g. Haiku for reflect node)."""
+    provider = _get_llm_provider()
+    if hasattr(provider, "generate_with_model"):
+        return await provider.generate_with_model(prompt, model_id, max_tokens)
+    # Fallback for Ollama — ignores model_id and uses default
+    return await provider.generate(prompt)

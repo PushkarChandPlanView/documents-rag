@@ -1,0 +1,22 @@
+{
+  "size": {{ size | default(10) }},
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match_all": {}
+        }
+      ]
+      {% if filters %},
+      "filter": {{ filters | tojson }}
+      {% endif %}
+    }
+  },
+  "knn": {
+    "field": "embedding",
+    "query_vector": {{ query_vector | tojson }},
+    "k": {{ size | default(10) }},
+    "num_candidates": {{ num_candidates | default(100) }},
+    "filter": {{ filters | tojson }}
+  }
+}

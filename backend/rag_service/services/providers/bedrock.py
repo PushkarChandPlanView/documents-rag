@@ -103,3 +103,26 @@ class BedrockProvider:
         async for token in self.generate_stream(prompt):
             tokens.append(token)
         return "".join(tokens).strip()
+
+    async def generate_with_model(self, prompt: str, model_id: str, max_tokens: int = 512) -> str:
+        """
+        Non-streaming generation with an explicit model override.
+        Used by reflect_node (Haiku) and other agentic nodes that need a different model.
+        """
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "temperature": 0.0,
+            "messages": [{"role": "user", "content": prompt}],
+        })
+        async with _boto_session.client(
+            "bedrock-runtime", region_name=settings.aws_region
+        ) as client:
+            resp = await client.invoke_model(
+                modelId=model_id,
+                body=body,
+                contentType="application/json",
+                accept="application/json",
+            )
+            result = json.loads(await resp["body"].read())
+            return result["content"][0]["text"].strip()

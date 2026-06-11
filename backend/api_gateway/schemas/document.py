@@ -32,6 +32,7 @@ class Item(BaseModel):
     file_size_bytes: Optional[int] = None
     status: Optional[str] = None
     source_url: Optional[str] = None
+    source_type: Optional[str] = None
     processing_jobs: list[ProcessingJobResponse] = []
     compliance_status: Optional[str] = None
     created_at: datetime
@@ -70,6 +71,7 @@ class DocumentDetailResponse(BaseModel):
     folder_id: Optional[UUID] = None
     folder_name: Optional[str] = None
     source_url: Optional[str] = None
+    source_type: Optional[str] = None
     summary: Optional[str] = None          # from document_summaries (active)
     created_at: datetime
     updated_at: datetime
@@ -88,6 +90,7 @@ class LinkCreateRequest(BaseModel):
     url: HttpUrl
     title: Optional[str] = None
     folder_id: Optional[UUID] = None
+    source_type: Optional[str] = "url"
 
 
 # ── Cursor helpers ────────────────────────────────────────────────────────────

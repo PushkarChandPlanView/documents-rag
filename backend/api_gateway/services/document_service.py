@@ -32,6 +32,7 @@ def _to_item(item: ItemModel, compliance_status: Optional[str] = None) -> Item:
         file_size_bytes=item.file_size_bytes,
         status=item.status,
         source_url=item.source_url,
+        source_type=item.source_type,
         processing_jobs=[ProcessingJobResponse.model_validate(j) for j in item.processing_jobs],
         compliance_status=compliance_status,
         created_at=item.created_at,
@@ -202,6 +203,7 @@ async def get_document_detail(
         folder_id=item.parent_id,
         folder_name=item.parent.name if item.parent else None,
         source_url=item.source_url,
+        source_type=item.source_type,
         summary=summary_row.summary if summary_row else None,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -379,7 +381,11 @@ async def list_folders(
     user_id: UUID,
     parent_id: Optional[UUID] = None,
 ) -> list[Item]:
-    stmt = select(ItemModel).where(ItemModel.user_id == user_id, ItemModel.type == "folder")
+    stmt = (
+        select(ItemModel)
+        .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
+        .where(ItemModel.user_id == user_id, ItemModel.type == "folder")
+    )
     if parent_id is None:
         stmt = stmt.where(ItemModel.parent_id.is_(None))
     else:

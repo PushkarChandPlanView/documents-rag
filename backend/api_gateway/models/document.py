@@ -40,6 +40,7 @@ class Document(Base):
     file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     minio_key: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     source_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    source_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(

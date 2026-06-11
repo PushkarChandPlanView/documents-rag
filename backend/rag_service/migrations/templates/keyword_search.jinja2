@@ -1,0 +1,40 @@
+{
+  "size": {{ size | default(10) }},
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "text": {
+              "query": "{{ query_text }}",
+              "boost": 2.0
+            }
+          }
+        },
+        {
+          "match": {
+            "document_name": {
+              "query": "{{ query_text }}",
+              "boost": 1.0
+            }
+          }
+        },
+        {
+          "match_phrase": {
+            "text": {
+              "query": "{{ query_text }}",
+              "boost": 3.0
+            }
+          }
+        }
+      ],
+      "minimum_should_match": 1
+      {% if filters %},
+      "filter": {{ filters | tojson }}
+      {% endif %}
+    }
+  }
+  {% if minimum_score %},
+  "min_score": {{ minimum_score }}
+  {% endif %}
+}

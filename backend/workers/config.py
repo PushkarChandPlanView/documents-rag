@@ -39,10 +39,15 @@ class WorkerSettings(BaseSettings):
     ollama_temperature: float = 0.1
     ollama_num_ctx: int = 4096
 
+    # ── Elasticsearch ────────────────────────────────────────────────────────
+    elasticsearch_url: str = "http://elasticsearch:9200"
+    es_index_chunks: str = "document_chunks"
+    es_embedding_dim: int = 1024           # must match the provider's output dim
+
     # ── Provider selection ────────────────────────────────────────────────────
     # "ollama" (default, local) or "bedrock" (AWS)
-    llm_provider: str = "ollama"
-    embed_provider: str = "ollama"
+    llm_provider: str = "bedrock"
+    embed_provider: str = "bedrock"
 
     # ── AWS Bedrock ───────────────────────────────────────────────────────────
     aws_region: str = "us-east-1"

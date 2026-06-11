@@ -30,6 +30,7 @@ def upgrade() -> None:
             updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
         )
     """)
+    op.execute("ALTER TABLE compliance_rules ADD CONSTRAINT uq_compliance_rules_name UNIQUE (name)")
     op.execute("CREATE INDEX ix_compliance_rules_is_active ON compliance_rules (is_active)")
     op.execute("CREATE INDEX ix_compliance_rules_rule_type ON compliance_rules (rule_type)")
 

@@ -8,8 +8,8 @@ x-aws-env: &aws-env
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
   AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
-  LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-  EMBED_PROVIDER: ${EMBED_PROVIDER:-ollama}
+  LLM_PROVIDER: ${LLM_PROVIDER:-bedrock}
+  EMBED_PROVIDER: ${EMBED_PROVIDER:-bedrock}
 
 networks:
   public:
@@ -23,6 +23,7 @@ volumes:
   ollama_models:
   kafka_data:
   zookeeper_data:
+  elasticsearch_data:
 
 services:
 
@@ -94,7 +95,7 @@ services:
       - kafka_data:/var/lib/kafka/data
     networks: [internal]
     healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD", "bash", "-c", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -150,8 +151,43 @@ services:
     entrypoint: ["/bin/sh", "/init-buckets.sh"]
     restart: "no"
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Elasticsearch (hybrid search — BM25 + kNN + RRF)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.ml.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "127.0.0.1:9200:9200"
+    networks: [internal, public]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Ollama (local LLM) — only started when COMPOSE_PROFILES=ollama
+  # Set LLM_PROVIDER=ollama / EMBED_PROVIDER=ollama in .env to use these.
+  # ─────────────────────────────────────────────────────────────────────────
+
   ollama:
     image: ollama/ollama:latest
+    profiles: [ollama]
     restart: unless-stopped
     volumes:
       - ollama_models:/root/.ollama
@@ -176,6 +212,7 @@ services:
 
   ollama-init:
     image: ollama/ollama:latest
+    profiles: [ollama]
     restart: "no"
     depends_on:
       ollama:
@@ -237,6 +274,8 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks: [internal]
     deploy:
       replicas: 2
@@ -262,6 +301,8 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks: [internal]
     deploy:
       replicas: 2
@@ -286,6 +327,8 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
     networks: [internal]
     deploy:
       replicas: 2
@@ -377,6 +420,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks: [internal]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -388,6 +433,96 @@ services:
         limits:
           cpus: "2.0"
           memory: 2G
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Search UI  (standalone /search + /ingest web app — separate from frontend)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  search_ui:
+    build:
+      context: ./backend/search_ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      RAG_SERVICE_URL: http://rag_service:8001
+      API_GATEWAY_URL: http://api_gateway:8000
+      API_GW_TOKEN: ${API_GW_TOKEN:-}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      ES_INDEX_CHUNKS: ${ES_INDEX_CHUNKS:-document_chunks}
+    depends_on:
+      api_gateway:
+        condition: service_healthy
+      rag_service:
+        condition: service_healthy
+    networks: [internal, public]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/search-ui/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Agent Service + Agent UI
+  # ─────────────────────────────────────────────────────────────────────────
+
+  agent_service:
+    build:
+      context: ./backend/agent_service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://docstore:changeme@postgres:5432/docstore
+      RAG_SERVICE_URL: http://rag_service:8001
+      API_GATEWAY_URL: http://api_gateway:8000
+      GW_SERVICE_EMAIL: ${GW_SERVICE_EMAIL:-admin1@example.com}
+      GW_SERVICE_PASS: ${GW_SERVICE_PASS:-changeme}
+      <<: *aws-env
+      BEDROCK_LLM_MODEL: ${BEDROCK_LLM_MODEL:-us.anthropic.claude-opus-4-5-20251101-v1:0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rag_service:
+        condition: service_healthy
+      api_gateway:
+        condition: service_healthy
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+  agent_ui:
+    build:
+      context: ./backend/agent_ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      AGENT_SERVICE_URL: http://agent_service:8002
+    depends_on:
+      agent_service:
+        condition: service_healthy
+    networks: [internal, public]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/agent-ui/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
 
   # ─────────────────────────────────────────────────────────────────────────
   # Frontend + Reverse Proxy
@@ -433,6 +568,8 @@ services:
     depends_on:
       - api_gateway
       - frontend
+      - search_ui
+      - agent_ui
     networks: [public]
     deploy:
       resources:

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search · documents-rag</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f8f9fa; }
+    .navbar-brand { font-weight: 700; letter-spacing: -.5px; }
+    #search-box  { font-size: 1.05rem; }
+
+    /* mode chips */
+    .mode-chip {
+      padding: .28rem .85rem; border-radius: 999px; font-size: .8rem;
+      cursor: pointer; border: 1.5px solid transparent; user-select: none; transition: opacity .15s;
+    }
+    .mode-chip.active   { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+    .mode-chip.inactive { background: #e9ecef; color: #495057; border-color: #dee2e6; }
+    .source-chip {
+      padding: .2rem .7rem; border-radius: 999px; font-size: .75rem;
+      cursor: pointer; border: 1.5px solid #dee2e6; background: #f8f9fa; color: #495057;
+      user-select: none; transition: all .15s;
+    }
+    .source-chip.active { background: #198754; color: #fff; border-color: #198754; }
+
+    /* result cards */
+    .result-card { transition: box-shadow .15s; cursor: pointer; }
+    .result-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.1); }
+    .score-pill  { font-size: .72rem; color: #6c757d; }
+    .meta-pill   { font-size: .73rem; padding: .18rem .5rem; border-radius: 4px;
+                   background: #e9ecef; color: #495057; }
+    .page-pill   { background: #d1ecf1; color: #0c5460; }
+    .type-pill   { background: #fff3cd; color: #856404; }
+    .content-full { display: none; white-space: pre-wrap; font-size: .87rem;
+                    background: #f1f3f5; padding: .75rem; border-radius: .4rem; margin-top: .5rem; }
+    .spinner-wrap { display:none; text-align:center; padding:2rem; }
+    .empty-state  { text-align:center; color:#adb5bd; padding:4rem 0; }
+    #latency-badge { font-size:.75rem; color:#6c757d; }
+
+    /* RAG answer box */
+    #answer-box { display:none; }
+    #answer-text { white-space: pre-wrap; font-size: .93rem; line-height: 1.65; }
+    .source-tag { font-size:.72rem; padding:.15rem .45rem; border-radius:3px;
+                  background:#e9ecef; color:#495057; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3 mb-4">
+  <a class="navbar-brand" href="/search">📄 documents-rag</a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/ingest" class="btn btn-sm btn-outline-light">+ Ingest</a>
+  </div>
+</nav>
+
+<div class="container" style="max-width:860px;">
+
+  <!-- Search box -->
+  <div class="input-group mb-3 shadow-sm">
+    <input id="search-box" type="text" class="form-control form-control-lg"
+           placeholder="Ask a question about your documents…" />
+    <button id="search-btn" class="btn btn-primary px-4">Search</button>
+    <button id="ask-btn"    class="btn btn-success  px-4">Ask AI ✨</button>
+  </div>
+
+  <!-- Controls -->
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+    <div>
+      <div class="text-muted mb-1" style="font-size:.76rem;">MODE</div>
+      <div class="d-flex gap-1">
+        <span class="mode-chip active"   data-mode="hybrid">Hybrid</span>
+        <span class="mode-chip inactive" data-mode="semantic">Semantic</span>
+        <span class="mode-chip inactive" data-mode="keyword">Keyword</span>
+        <span class="mode-chip inactive" data-mode="pgvector">pgvector</span>
+        <span class="mode-chip inactive" data-mode="agentic">🤖 Agentic</span>
+      </div>
+    </div>
+    <div>
+      <div class="text-muted mb-1" style="font-size:.76rem;">TOP K</div>
+      <select id="filter-topk" class="form-select form-select-sm">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+      </select>
+    </div>
+    <div>
+      <div class="text-muted mb-1" style="font-size:.76rem;">USER ID</div>
+      <input id="user-id" type="text" class="form-control form-control-sm" style="width:180px;"
+             placeholder="admin@example.com" />
+    </div>
+    <div class="ms-auto pt-3">
+      <span id="latency-badge"></span>
+    </div>
+  </div>
+
+  <!-- Source filters -->
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+    <span class="text-muted me-1" style="font-size:.76rem;">SOURCE:</span>
+    <span class="source-chip active" data-src="all">All</span>
+    <span class="source-chip" data-src="upload">📄 Upload</span>
+    <span class="source-chip" data-src="url">🌐 URL</span>
+    <span class="source-chip" data-src="jira">🐛 Jira</span>
+    <span class="source-chip" data-src="confluence">📘 Confluence</span>
+    <span class="source-chip" data-src="slack">💬 Slack</span>
+    <span class="source-chip" data-src="github">🐙 GitHub</span>
+    <span class="source-chip" data-src="hubspot">🟠 HubSpot</span>
+  </div>
+
+  <!-- RAG answer (Ask AI) -->
+  <div id="answer-box" class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="fw-bold mb-2">✨ AI Answer</h6>
+      <div id="answer-text" class="text-secondary">…</div>
+      <div id="answer-sources" class="mt-2 d-flex flex-wrap gap-1"></div>
+    </div>
+  </div>
+
+  <!-- Spinner -->
+  <div class="spinner-wrap" id="spinner">
+    <div class="spinner-border text-primary"></div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" id="empty-state">
+    <p class="fs-3">🔎</p>
+    <p class="mb-1">Search across all your ingested documents</p>
+    <p class="text-muted" style="font-size:.88rem;">Hybrid · Semantic · Keyword · pgvector</p>
+  </div>
+
+  <div class="alert alert-danger d-none" id="error-box"></div>
+  <div id="results"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const $box     = document.getElementById('search-box');
+const $results = document.getElementById('results');
+const $spinner = document.getElementById('spinner');
+const $empty   = document.getElementById('empty-state');
+const $error   = document.getElementById('error-box');
+const $latency = document.getElementById('latency-badge');
+const $userId  = document.getElementById('user-id');
+const $answerBox  = document.getElementById('answer-box');
+const $answerText = document.getElementById('answer-text');
+const $answerSrc  = document.getElementById('answer-sources');
+
+// Persist user-id
+const savedUser = localStorage.getItem('docrag_user');
+if (savedUser) $userId.value = savedUser;
+$userId.addEventListener('change', () => localStorage.setItem('docrag_user', $userId.value));
+
+// Mode chips
+document.querySelectorAll('.mode-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.mode-chip').forEach(c => { c.classList.replace('active','inactive') || c.classList.remove('active') || c.classList.add('inactive'); });
+    chip.classList.replace('inactive','active');
+  });
+});
+function getMode() { return document.querySelector('.mode-chip.active')?.dataset.mode || 'hybrid'; }
+
+// Source chips — multi-select; "All" toggles off all others
+document.querySelectorAll('.source-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (chip.dataset.src === 'all') {
+      document.querySelectorAll('.source-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    } else {
+      document.querySelector('.source-chip[data-src="all"]').classList.remove('active');
+      chip.classList.toggle('active');
+      if (!document.querySelector('.source-chip.active')) {
+        document.querySelector('.source-chip[data-src="all"]').classList.add('active');
+      }
+    }
+  });
+});
+function getSourceTypes() {
+  const active = [...document.querySelectorAll('.source-chip.active')].map(c => c.dataset.src);
+  if (active.includes('all') || active.length === 0) return null;
+  return active;
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function buildCard(r) {
+  const preview = escHtml((r.text || '').slice(0, 300));
+  const full    = escHtml(r.text || '');
+  return `
+  <div class="card result-card mb-3 border-0 shadow-sm" onclick="toggleCard(this)">
+    <div class="card-body pb-2">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <strong style="font-size:.95rem">${escHtml(r.document_name || r.document_id)}</strong>
+        <span class="score-pill ms-2 text-nowrap">▲ ${(r.score||0).toFixed(4)}</span>
+      </div>
+      <div class="d-flex flex-wrap gap-1 mb-2">
+        ${r.file_type ? `<span class="meta-pill type-pill">${escHtml(r.file_type)}</span>` : ''}
+        ${r.page_number != null ? `<span class="meta-pill page-pill">p.${r.page_number}</span>` : ''}
+        ${r.document_id ? `<span class="meta-pill" style="font-size:.67rem">${escHtml(r.document_id)}</span>` : ''}
+        ${r.latency_ms  ? `<span class="meta-pill">${r.latency_ms}ms</span>` : ''}
+      </div>
+      <p class="text-muted mb-1" style="font-size:.875rem">${preview}${(r.text||'').length>300?'…':''}</p>
+      <div class="content-full">${full}</div>
+    </div>
+  </div>`;
+}
+
+function toggleCard(card) {
+  const el = card.querySelector('.content-full');
+  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+function resetUI() {
+  $results.innerHTML = '';
+  $empty.style.display = 'none';
+  $error.classList.add('d-none');
+  $answerBox.style.display = 'none';
+  $spinner.style.display = 'block';
+  $latency.textContent = '';
+}
+
+// ── Search (chunk retrieval) ──────────────────────────────────────────────────
+async function doSearch() {
+  const query = $box.value.trim();
+  if (!query) return;
+
+  // Agentic mode is a full RAG loop — route to doAgentic()
+  if (getMode() === 'agentic') { return doAgentic(); }
+
+  resetUI();
+
+  const payload = {
+    query,
+    user_id:      $userId.value || 'admin@example.com',
+    top_k:        parseInt(document.getElementById('filter-topk').value),
+    mode:         getMode(),
+    source_types: getSourceTypes(),
+  };
+
+  try {
+    const res  = await fetch('/search-ui/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    $spinner.style.display = 'none';
+
+    if (!res.ok) {
+      $error.textContent = data.error || 'Search failed.';
+      $error.classList.remove('d-none');
+      return;
+    }
+
+    const results = data.results || [];
+    if (!results.length) {
+      $results.innerHTML = '<p class="text-center text-muted py-4">No results found.</p>';
+      return;
+    }
+
+    const latency = results[0]?.latency_ms;
+    $latency.textContent = `${results.length} chunk${results.length!==1?'s':''}`
+      + (latency ? ` · ${latency}ms` : '');
+    $results.innerHTML = results.map(buildCard).join('');
+  } catch (err) {
+    $spinner.style.display = 'none';
+    $error.textContent = 'Request failed: ' + err.message;
+    $error.classList.remove('d-none');
+  }
+}
+
+// ── Agentic Search (router → search → reflect → generate loop) ───────────────
+async function doAgentic() {
+  const query = $box.value.trim();
+  if (!query) return;
+  resetUI();
+
+  $answerBox.style.display = 'block';
+  $answerText.innerHTML = '<span class="text-muted">🤖 Running agentic search…</span>';
+  $answerSrc.innerHTML  = '';
+
+  const payload = {
+    query,
+    user_id:      $userId.value || 'admin@example.com',
+    max_iter:     3,
+    source_types: getSourceTypes(),
+  };
+
+  try {
+    const res = await fetch('/search-ui/api/agentic-query', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    $spinner.style.display = 'none';
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      $error.textContent = data.error || 'Agentic query failed.';
+      $error.classList.remove('d-none');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+    let   answer = '';
+    let   status = '';
+
+    $answerText.innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const msg = JSON.parse(line.slice(6));
+
+          if (msg.type === 'routing') {
+            status = `🔀 Routing → ${msg.mode}`;
+            $answerText.innerHTML = `<span class="text-muted">${escHtml(status)}</span>`;
+          } else if (msg.type === 'searching') {
+            status = `🔍 Searching (iteration ${msg.iteration || 1})…`;
+            $answerText.innerHTML = `<span class="text-muted">${escHtml(status)}</span>`;
+          } else if (msg.type === 'reflecting') {
+            if (msg.sufficient) {
+              status = '✅ Results sufficient — generating answer…';
+            } else {
+              status = `🔄 Refining: ${msg.reflection || 'trying again'}…`;
+            }
+            $answerText.innerHTML = `<span class="text-muted">${escHtml(status)}</span>`;
+          } else if (msg.type === 'token' && msg.content) {
+            answer += msg.content;
+            $answerText.textContent = answer;
+          } else if (msg.type === 'done') {
+            if (msg.sources && msg.sources.length) {
+              $answerSrc.innerHTML = msg.sources
+                .map(s => `<span class="source-tag">${escHtml(s.document_name || s.document_id || '')}</span>`)
+                .join('');
+            }
+          } else if (msg.type === 'error') {
+            $answerText.textContent = msg.content || 'Agentic search failed.';
+          }
+        } catch (_) {}
+      }
+    }
+    if (!answer) $answerText.innerHTML = '<span class="text-muted">No answer generated.</span>';
+  } catch (err) {
+    $spinner.style.display = 'none';
+    $error.textContent = 'Request failed: ' + err.message;
+    $error.classList.remove('d-none');
+  }
+}
+
+// ── Ask AI (SSE streaming RAG) ────────────────────────────────────────────────
+async function doAsk() {
+  const query = $box.value.trim();
+  if (!query) return;
+  resetUI();
+
+  $answerBox.style.display = 'block';
+  $answerText.textContent  = '…';
+  $answerSrc.innerHTML     = '';
+
+  const payload = {
+    query,
+    user_id:      $userId.value || 'admin@example.com',
+    source_types: getSourceTypes(),
+  };
+
+  try {
+    const res = await fetch('/search-ui/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    $spinner.style.display = 'none';
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      $error.textContent = data.error || 'Query failed.';
+      $error.classList.remove('d-none');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+    let   answer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const msg = JSON.parse(line.slice(6));
+          if (msg.token) {
+            answer += msg.token;
+            $answerText.textContent = answer;
+          }
+          if (msg.sources && msg.sources.length) {
+            $answerSrc.innerHTML = msg.sources
+              .map(s => `<span class="source-tag">${escHtml(s.document_name||s.document_id||'')}</span>`)
+              .join('');
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    $spinner.style.display = 'none';
+    $error.textContent = 'Request failed: ' + err.message;
+    $error.classList.remove('d-none');
+  }
+}
+
+document.getElementById('search-btn').addEventListener('click', doSearch);
+document.getElementById('ask-btn').addEventListener('click', doAsk);
+$box.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+</script>
+</body>
+</html>

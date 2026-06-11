@@ -45,6 +45,45 @@ _engine = None
 _session_factory = None
 
 
+def _is_valid_uuid(value: str) -> bool:
+    """Return True only if value is a valid UUID string (36 chars with dashes)."""
+    import uuid as _uuid
+    try:
+        _uuid.UUID(str(value))
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+def _user_where(user_id: str, alias: str = "de") -> str:
+    """Return a WHERE fragment for user_id only when it is a valid UUID.
+    Returns empty string (no filter) for non-UUID values like emails."""
+    if _is_valid_uuid(user_id):
+        return f"{alias}.user_id = CAST(:user_id AS uuid)"
+    return ""
+
+
+def _build_where(user_id: str, document_ids: Optional[list[str]]) -> tuple[str, dict]:
+    """Build WHERE clause + params dict for user_id + optional document_ids filters."""
+    parts = []
+    params: dict = {}
+
+    user_clause = _user_where(user_id)
+    if user_clause:
+        parts.append(user_clause)
+        params["user_id"] = user_id
+
+    if document_ids and len(document_ids) == 1:
+        parts.append("de.document_id = CAST(:doc_id AS uuid)")
+        params["doc_id"] = document_ids[0]
+    elif document_ids:
+        parts.append("de.document_id = ANY(CAST(:doc_ids AS uuid[]))")
+        params["doc_ids"] = document_ids
+
+    clause = " AND ".join(parts) if parts else "1=1"
+    return clause, params
+
+
 def _get_session_factory() -> async_sessionmaker:
     global _engine, _session_factory
     if _session_factory is None:
@@ -103,17 +142,9 @@ async def _semantic_search(
     """Run a cosine similarity search using pgvector's <=> operator."""
     emb_literal = _embedding_literal(embedding)
 
-    if document_ids and len(document_ids) == 1:
-        where_clause = "de.user_id = CAST(:user_id AS uuid) AND de.document_id = CAST(:doc_id AS uuid)"
-        params: dict = {"user_id": user_id, "doc_id": document_ids[0],
-                        "embedding": emb_literal, "top_k": top_k}
-    elif document_ids:
-        where_clause = "de.user_id = CAST(:user_id AS uuid) AND de.document_id = ANY(CAST(:doc_ids AS uuid[]))"
-        params = {"user_id": user_id, "doc_ids": document_ids,
-                  "embedding": emb_literal, "top_k": top_k}
-    else:
-        where_clause = "de.user_id = CAST(:user_id AS uuid)"
-        params = {"user_id": user_id, "embedding": emb_literal, "top_k": top_k}
+    where_clause, params = _build_where(user_id, document_ids)
+    params["embedding"] = emb_literal
+    params["top_k"] = top_k
 
     result = await session.execute(
         sql_text(f"""
@@ -159,11 +190,10 @@ async def _fetch_neighbors(
                 dc.text
             FROM document_embeddings de
             JOIN document_chunks dc ON dc.id = de.chunk_id
-            WHERE de.user_id = CAST(:user_id AS uuid)
-              AND de.document_id = CAST(:doc_id AS uuid)
+            WHERE de.document_id = CAST(:doc_id AS uuid)
               AND de.chunk_index = ANY(:indices)
         """),
-        {"user_id": user_id, "doc_id": document_id, "indices": chunk_indices},
+        {"doc_id": document_id, "indices": chunk_indices},
     )
     neighbors = []
     for row in result.fetchall():
@@ -185,7 +215,7 @@ async def _fetch_neighbors(
 def _rows_to_chunks(rows: list[dict], terms: set[str]) -> list[RetrievedChunk]:
     chunks = []
     for row in rows:
-        semantic_score = 1.0 - row["distance"]
+        semantic_score = max(0.0, 1.0 - row["distance"])  # clamp: distance can exceed 1.0 for dissimilar vectors
         kw_score = _keyword_score(terms, row["text"])
         hybrid_score = (SEMANTIC_WEIGHT * semantic_score) + (KEYWORD_WEIGHT * kw_score)
         chunks.append(RetrievedChunk(
@@ -222,35 +252,12 @@ async def retrieve(
         emb_literal = _embedding_literal(query_embedding)
         merged_rows: dict[str, dict] = {}
         for term in significant:
-            if document_ids and len(document_ids) == 1:
-                where_clause = (
-                    "de.user_id = CAST(:user_id AS uuid) "
-                    "AND de.document_id = CAST(:doc_id AS uuid) "
-                    "AND dc.text ILIKE :term"
-                )
-                params: dict = {
-                    "user_id": user_id, "doc_id": document_ids[0],
-                    "embedding": emb_literal, "top_k": top_k, "term": f"%{term}%",
-                }
-            elif document_ids:
-                where_clause = (
-                    "de.user_id = CAST(:user_id AS uuid) "
-                    "AND de.document_id = ANY(CAST(:doc_ids AS uuid[])) "
-                    "AND dc.text ILIKE :term"
-                )
-                params = {
-                    "user_id": user_id, "doc_ids": document_ids,
-                    "embedding": emb_literal, "top_k": top_k, "term": f"%{term}%",
-                }
-            else:
-                where_clause = (
-                    "de.user_id = CAST(:user_id AS uuid) "
-                    "AND dc.text ILIKE :term"
-                )
-                params = {
-                    "user_id": user_id, "embedding": emb_literal,
-                    "top_k": top_k, "term": f"%{term}%",
-                }
+            base_where, base_params = _build_where(user_id, document_ids)
+            where_clause = f"{base_where} AND dc.text ILIKE :term" if base_where != "1=1" else "dc.text ILIKE :term"
+            params: dict = {
+                **base_params,
+                "embedding": emb_literal, "top_k": top_k, "term": f"%{term}%",
+            }
 
             result = await session.execute(
                 sql_text(f"""

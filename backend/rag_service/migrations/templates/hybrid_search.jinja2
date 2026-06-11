@@ -1,0 +1,39 @@
+{
+  "size": {{ size | default(10) }},
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "text": {
+              "query": "{{ query_text }}",
+              "boost": 1.0
+            }
+          }
+        },
+        {
+          "match": {
+            "document_name": {
+              "query": "{{ query_text }}",
+              "boost": 0.5
+            }
+          }
+        },
+        {
+          "script_score": {
+            "query": {"match_all": {}},
+            "script": {
+              "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+              "params": {"query_vector": {{ query_vector | tojson }}}
+            },
+            "boost": 2.0
+          }
+        }
+      ],
+      "minimum_should_match": 1
+      {% if filters %},
+      "filter": {{ filters | tojson }}
+      {% endif %}
+    }
+  }
+}

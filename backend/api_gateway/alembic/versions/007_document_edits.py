@@ -1,13 +1,13 @@
 """Add document_edits table for chat-driven document editing
 
-Revision ID: 006
-Revises: 005
+Revision ID: 007
+Revises: 006
 Create Date: 2026-06-09
 """
 from alembic import op
 
-revision = "006"
-down_revision = "005"
+revision = "007"
+down_revision = "006"
 branch_labels = None
 depends_on = None
 
