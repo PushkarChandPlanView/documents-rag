@@ -96,10 +96,10 @@ services:
     networks: [internal]
     healthcheck:
       test: ["CMD", "bash", "-c", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -251,6 +251,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    volumes:
+      - ./scripts:/scripts:ro   # makes seed_data.py & sanity_check.py available via exec
     deploy:
       resources:
         limits:

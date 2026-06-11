@@ -274,6 +274,15 @@ if [[ "$APP" == "all" || "$APP" == "docs" || "$APP" == "search" || "$APP" == "ag
   else
     warn "api_gateway seed failed — run manually: docker compose exec api_gateway python seed.py"
   fi
+
+  # Seed synthetic Forge SaaS documents (idempotent — skips existing [seed] docs)
+  log "Seeding synthetic Forge SaaS documents (scenarios A + B)..."
+  if docker compose exec -T api_gateway python /scripts/seed_data.py \
+      --base-url http://nginx:80 --wait; then
+    success "Forge seed documents ready"
+  else
+    warn "Document seed failed — run manually: make seed-data"
+  fi
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -285,19 +294,17 @@ docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/nul
 
 echo ""
 echo -e "${BOLD}Access points:${RESET}"
-echo -e "  ${GREEN}Frontend / Documents UI${RESET}   →  http://localhost"
-echo -e "  ${GREEN}API Gateway${RESET}               →  http://localhost/api"
-echo -e "  ${GREEN}Search UI${RESET}                 →  http://localhost/search-ui"
-echo -e "  ${GREEN}Agent UI${RESET}                  →  http://localhost/agent-ui"
-echo -e "  ${GREEN}MinIO Console${RESET}             →  http://localhost:9091"
-echo -e "  ${GREEN}Kafka UI${RESET}                  →  http://localhost:8082"
+echo -e "  ${GREEN}Search UI${RESET}    →  http://localhost:8081/search"
+echo -e "  ${GREEN}Ingest UI${RESET}    →  http://localhost:8081/ingest"
+echo -e "  ${GREEN}Agent UI${RESET}     →  http://localhost:8081/agents"
+echo -e "  ${GREEN}API${RESET}          →  http://localhost:8081/api"
+echo -e "  ${GREEN}MinIO Console${RESET}→  http://localhost:9091"
+echo -e "  ${GREEN}Kafka UI${RESET}     →  http://localhost:8082"
 
 echo ""
-echo -e "${BOLD}Next steps:${RESET}"
-echo -e "  ${CYAN}Seed test documents (Forge SaaS scenarios):${RESET}"
-echo -e "    python scripts/seed_data.py --wait"
-echo ""
 echo -e "${BOLD}Useful commands:${RESET}"
+echo -e "  make sanity                 # run end-to-end sanity check"
+echo -e "  make seed-data              # re-seed Forge test documents"
 echo -e "  make logs svc=api_gateway   # tail logs for a service"
 echo -e "  make shell-api              # shell into api_gateway"
 echo -e "  make shell-db               # psql into postgres"

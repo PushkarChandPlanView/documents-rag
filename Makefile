@@ -1,4 +1,4 @@
-.PHONY: up down build restart logs migrate topics seed clean help frontend-dev frontend-install
+.PHONY: up down build restart logs migrate topics seed seed-data sanity clean help frontend-dev frontend-install
 
 COMPOSE = docker compose
 ENV_FILE = .env
@@ -32,8 +32,20 @@ topics: ## Create Kafka topics (runs kafka-init container)
 pull-models: ## Pull Ollama models (llama3, mistral, nomic-embed-text)
 	$(COMPOSE) exec ollama bash /pull-models.sh
 
-seed: ## Seed a test user (admin@example.com / changeme)
+seed: ## Seed default users + compliance rules (admin@example.com / changeme)
 	$(COMPOSE) exec api_gateway python seed.py
+
+seed-data: ## Seed synthetic Forge SaaS documents (both scenarios, waits for processing)
+	$(COMPOSE) run --rm \
+		-v "$(PWD)/scripts:/scripts" \
+		api_gateway \
+		python /scripts/seed_data.py --base-url http://nginx:80 --wait $(args)
+
+sanity: ## Run end-to-end sanity check (all 20 checks)
+	$(COMPOSE) run --rm \
+		-v "$(PWD)/scripts:/scripts" \
+		api_gateway \
+		python /scripts/sanity_check.py --base-url http://nginx:80 $(args)
 
 ps: ## Show running containers
 	$(COMPOSE) ps
