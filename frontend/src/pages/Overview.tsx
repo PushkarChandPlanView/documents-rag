@@ -130,7 +130,7 @@ export default function Overview() {
   };
 
   return (
-    <Layout>
+    <>
       <PageWrapper>
         <Toolbar label="Overview toolbar">
           <ToolbarSectionLeft>
@@ -179,6 +179,6 @@ export default function Overview() {
           </Section>
         </Body>
       </PageWrapper>
-    </Layout>
+    </>
   );
 }

@@ -33,6 +33,33 @@ Document excerpts:
 Relevant information:"""
 
 
+XLSX_EDIT_PROMPT = """You are an Excel spreadsheet editor. The current spreadsheet content is shown below.
+Apply the requested change and return a JSON array describing ALL sheets in the final spreadsheet.
+
+Current content:
+{document_text}
+
+Requested change: {instruction}
+
+Return ONLY a valid JSON array — no explanation, no markdown fences. Each element describes one sheet:
+[
+  {{
+    "name": "Sheet name",
+    "columns": ["Col1", "Col2", "Col3"],
+    "rows": [
+      ["val1", "val2", "val3"],
+      ["val4", "val5", "val6"]
+    ]
+  }}
+]
+
+Rules:
+- Include ALL existing sheets unchanged, plus any new or modified sheets.
+- Preserve existing data exactly unless the instruction requires changing it.
+- Column headers go in "columns"; data rows go in "rows".
+- Use null for empty cells."""
+
+
 EDIT_PROMPT = """You are a precise document editor. Apply the requested change to the document below.
 
 Rules:

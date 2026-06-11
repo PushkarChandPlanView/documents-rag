@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@planview/pv-details": "^2.1.0",
+    "@planview/pv-editor": "^2.0.3",
     "@planview/pv-filter": "^3.0.2",
     "@planview/pv-form": "^2.0.0",
     "@planview/pv-grid": "^2.0.2",
@@ -20,6 +21,7 @@
     "@planview/pv-utilities": "^5.0.0",
     "@tanstack/react-query": "^5.40.0",
     "axios": "^1.7.2",
+    "mammoth": "^1.8.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-intl": "^7.0.0",
@@ -27,6 +29,7 @@
     "react-router-dom": "^6.23.1",
     "remark-gfm": "^4.0.1",
     "styled-components": "^6.3.11",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.2"
   },
   "pnpm": {

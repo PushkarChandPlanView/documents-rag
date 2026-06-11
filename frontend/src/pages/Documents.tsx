@@ -86,7 +86,7 @@ export default function Documents() {
   };
 
   return (
-    <Layout>
+    <>
       <PageWrapper>
         <ItemToolbar
           onToggleFilter={() => setFilterOpen((v) => !v)}
@@ -135,6 +135,6 @@ export default function Documents() {
       <FileUploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} folderId={folderId} />
       <CreateFolderDialog open={createFolderOpen} onClose={() => setCreateFolderOpen(false)} parentId={folderId} />
       <AddLinkDialog open={addLinkOpen} onClose={() => setAddLinkOpen(false)} folderId={folderId} />
-    </Layout>
+    </>
   );
 }

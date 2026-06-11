@@ -10,15 +10,28 @@ import { IMAGE_MIMES } from "@/constants";
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const OFFICE_MIMES = new Set([
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.ms-powerpoint",
 ]);
 
+const DOCX_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+]);
+
+const XLSX_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+]);
+
 const TEXT_MIMES = new Set(["text/plain", "text/markdown", "text/csv"]);
+
+// ── types ─────────────────────────────────────────────────────────────────────
+
+interface SheetData {
+  name: string;
+  rows: (string | number | null)[][];
+}
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
@@ -64,14 +77,8 @@ const CloseBtn = styled.button`
   border-radius: 50%;
   flex-shrink: 0;
   color: #e8eaed;
-  &:hover {
-    background: rgba(255,255,255,0.1);
-  }
-  svg {
-    width: 20px;
-    height: 20px;
-    fill: currentColor;
-  }
+  &:hover { background: rgba(255,255,255,0.1); }
+  svg { width: 20px; height: 20px; fill: currentColor; }
 `;
 
 const Body = styled.div`
@@ -90,7 +97,6 @@ const PreviewFrame = styled.iframe`
   min-height: 0;
 `;
 
-// Images: dark background, centered both axes (Google Drive style)
 const ImageBody = styled.div`
   flex: 1;
   min-height: 0;
@@ -123,6 +129,64 @@ const TextContent = styled.pre`
   overflow: auto;
 `;
 
+const DocxWrapper = styled.div`
+  flex: 1;
+  overflow: auto;
+  padding: ${spacing.large}px;
+  background: #fff;
+  color: ${color.textPrimary};
+  line-height: 1.7;
+  font-size: 0.9rem;
+
+  h1, h2, h3, h4 { margin: 0.8em 0 0.4em; font-weight: 600; }
+  p { margin: 0 0 0.6em; }
+  ul, ol { padding-left: 1.5em; margin: 0 0 0.6em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+  td, th { border: 1px solid ${color.borderLight}; padding: 4px 8px; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+`;
+
+const XlsxWrapper = styled.div`
+  flex: 1;
+  overflow: auto;
+  padding: ${spacing.medium}px;
+  background: #fff;
+`;
+
+const SheetTitle = styled.h3`
+  ${text.regularSemibold};
+  color: ${color.textPrimary};
+  margin: ${spacing.medium}px 0 ${spacing.xsmall}px;
+  &:first-child { margin-top: 0; }
+`;
+
+const TableScroll = styled.div`
+  overflow-x: auto;
+  margin-bottom: ${spacing.large}px;
+`;
+
+const Table = styled.table`
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  white-space: nowrap;
+`;
+
+const Th = styled.th`
+  padding: 4px 10px;
+  background: ${color.backgroundNeutral50};
+  border: 1px solid ${color.borderLight};
+  font-weight: 600;
+  color: ${color.textSecondary};
+  text-align: left;
+`;
+
+const Td = styled.td`
+  padding: 4px 10px;
+  border: 1px solid ${color.borderLight};
+  color: ${color.textPrimary};
+`;
+
 const Center = styled.div`
   display: flex;
   flex-direction: column;
@@ -146,6 +210,8 @@ interface Props {
 export function PreviewPane({ doc, onClose }: Props) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
+  const [sheets, setSheets] = useState<SheetData[] | null>(null);
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,33 +220,48 @@ export function PreviewPane({ doc, onClose }: Props) {
   const isPdf = mime === "application/pdf";
   const isText = TEXT_MIMES.has(mime);
   const isOffice = OFFICE_MIMES.has(mime);
+  const isXlsx = XLSX_MIMES.has(mime);
+  const isDocx = DOCX_MIMES.has(mime);
   const isLink = mime === "text/html";
 
-  // Close on Escape key
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
   useEffect(() => {
-    if (isLink || isOffice) {
-      setLoading(false);
-      return;
-    }
+    if (isLink || isOffice) { setLoading(false); return; }
 
     let objectUrl: string | null = null;
     setLoading(true);
     setError(null);
     setBlobUrl(null);
     setTextContent(null);
+    setSheets(null);
+    setDocxHtml(null);
 
-    documentsApi
-      .getFile(doc.id)
+    documentsApi.getFile(doc.id)
       .then(async (blob) => {
-        if (isText) {
+        if (isDocx) {
+          // @ts-ignore — mammoth installed in Docker build via package.json
+          const mammoth = await import("mammoth") as any;
+          const ab = await blob.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer: ab });
+          setDocxHtml(result.value);
+        } else if (isXlsx) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment
+          // @ts-ignore — xlsx installed in Docker build via package.json
+          const XLSX = await import("xlsx") as any;
+          const ab = await blob.arrayBuffer();
+          const wb = XLSX.read(ab, { type: "array" });
+          const parsed: SheetData[] = (wb.SheetNames as string[]).map((name: string) => {
+            const ws = wb.Sheets[name];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as (string | number | null)[][];
+            return { name, rows };
+          });
+          setSheets(parsed);
+        } else if (isText) {
           setTextContent(await blob.text());
         } else {
           objectUrl = URL.createObjectURL(blob);
@@ -190,9 +271,7 @@ export function PreviewPane({ doc, onClose }: Props) {
       .catch(() => setError("Could not load file preview."))
       .finally(() => setLoading(false));
 
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [doc.id, mime]);
 
   const handleDownload = async () => {
@@ -204,52 +283,74 @@ export function PreviewPane({ doc, onClose }: Props) {
       a.download = doc.name ?? "file";
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      // silently fail
-    }
+    } catch { /* silently fail */ }
   };
 
   const renderBody = () => {
-    if (isLink) {
-      return (
-        <Center>
-          <span>This document is a web link — no file to preview.</span>
-          {doc.source_url && (
-            <a href={doc.source_url} target="_blank" rel="noreferrer">
-              <ButtonEmpty>Open source URL</ButtonEmpty>
-            </a>
-          )}
-        </Center>
-      );
-    }
+    if (isLink) return (
+      <Center>
+        <span>This document is a web link — no file to preview.</span>
+        {doc.source_url && (
+          <a href={doc.source_url} target="_blank" rel="noreferrer">
+            <ButtonEmpty>Open source URL</ButtonEmpty>
+          </a>
+        )}
+      </Center>
+    );
 
-    if (isOffice) {
-      return (
-        <Center>
-          <span>Browser preview is not available for this file type.</span>
-          <ButtonEmpty onClick={handleDownload}>Download to open</ButtonEmpty>
-        </Center>
-      );
-    }
+    if (isOffice) return (
+      <Center>
+        <span>Browser preview is not available for this file type.</span>
+        <ButtonEmpty onClick={handleDownload}>Download to open</ButtonEmpty>
+      </Center>
+    );
 
     if (loading) return <Center>Loading preview…</Center>;
     if (error) return <Center>{error}</Center>;
 
-    if (isText && textContent !== null) {
-      return <TextContent>{textContent}</TextContent>;
-    }
+    if (isDocx && docxHtml !== null) return (
+      <DocxWrapper dangerouslySetInnerHTML={{ __html: docxHtml }} />
+    );
 
-    if (isImage && blobUrl) {
-      return (
-        <ImageBody>
-          <PreviewImage src={blobUrl} alt={doc.name ?? "preview"} />
-        </ImageBody>
-      );
-    }
+    if (isXlsx && sheets) return (
+      <XlsxWrapper>
+        {sheets.map((sheet) => (
+          <div key={sheet.name}>
+            <SheetTitle>{sheet.name}</SheetTitle>
+            <TableScroll>
+              <Table>
+                <thead>
+                  <tr>
+                    {(sheet.rows[0] ?? []).map((cell, i) => (
+                      <Th key={i}>{cell ?? ""}</Th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheet.rows.slice(1).map((row, ri) => (
+                    <tr key={ri}>
+                      {row.map((cell, ci) => (
+                        <Td key={ci}>{cell ?? ""}</Td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </TableScroll>
+          </div>
+        ))}
+      </XlsxWrapper>
+    );
 
-    if (isPdf && blobUrl) {
-      return <PreviewFrame src={blobUrl} title={doc.name ?? "PDF preview"} />;
-    }
+    if (isText && textContent !== null) return <TextContent>{textContent}</TextContent>;
+
+    if (isImage && blobUrl) return (
+      <ImageBody>
+        <PreviewImage src={blobUrl} alt={doc.name ?? "preview"} />
+      </ImageBody>
+    );
+
+    if (isPdf && blobUrl) return <PreviewFrame src={blobUrl} title={doc.name ?? "PDF preview"} />;
 
     return (
       <Center>
@@ -263,9 +364,7 @@ export function PreviewPane({ doc, onClose }: Props) {
     <Overlay>
       <Header>
         <DocName>{doc.name}</DocName>
-        <CloseBtn onClick={onClose} aria-label="Close preview">
-          <Cancel />
-        </CloseBtn>
+        <CloseBtn onClick={onClose} aria-label="Close preview"><Cancel /></CloseBtn>
       </Header>
       <Body>{renderBody()}</Body>
     </Overlay>

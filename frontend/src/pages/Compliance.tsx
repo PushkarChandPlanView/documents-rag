@@ -37,7 +37,7 @@ export function Compliance() {
   }
 
   return (
-    <Layout>
+    
       <PageWrapper>
         <ComplianceToolbar
           isAdmin={isAdmin}
@@ -55,6 +55,5 @@ export function Compliance() {
           onCloseCreate={() => setShowCreate(false)}
         />
       </PageWrapper>
-    </Layout>
   );
 }

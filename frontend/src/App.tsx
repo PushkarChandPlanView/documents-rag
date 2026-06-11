@@ -13,6 +13,8 @@ import Overview from "@/pages/Overview";
 import Documents from "@/pages/Documents";
 import { Compliance } from "@/pages/Compliance";
 import { SearchBar } from "./components/search/SearchBar";
+import SourceConfig from "./pages/SourceConfig";
+import Layout from "./components/layout/Layout";
 
 export default function App() {
   return (
@@ -21,16 +23,19 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Overview />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/documents/:docId" element={<Documents />} />
-            <Route path="/search" element={<SearchBar />} />
-            <Route path="/folders/:folderId" element={<Documents />} />
-            <Route path="/folders/:folderId/:docId" element={<Documents />} />
-            <Route path="/compliance" element={<Compliance />} />
+          <Route element={<Layout />}>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Overview />} />
+              <Route path="/documents" element={<Documents />} />
+              <Route path="/documents/:docId" element={<Documents />} />
+              <Route path="/search" element={<SearchBar />} />
+              <Route path="/folders/:folderId" element={<Documents />} />
+              <Route path="/folders/:folderId/:docId" element={<Documents />} />
+              <Route path="/compliance" element={<Compliance />} />
+              <Route path="/sources" element={<SourceConfig />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

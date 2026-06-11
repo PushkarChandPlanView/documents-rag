@@ -19,8 +19,10 @@ class DocumentEditResponse(BaseModel):
     original_content: str
     proposed_content: str
     status: str
-    version: int | None
+    version: int | None = None
     created_at: datetime
+    mime_type: str | None = None
+    raw_minio_key: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -33,9 +34,11 @@ class DocumentEdit(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", index=True
     )
-    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    mime_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    raw_minio_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     document: Mapped["Document"] = relationship("Document", back_populates="edits")  # type: ignore[name-defined]

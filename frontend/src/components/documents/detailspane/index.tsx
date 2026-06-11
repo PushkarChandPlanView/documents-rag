@@ -15,6 +15,7 @@ import {
   Info,
   Link,
   Refresh,
+  Comment,
   History
 } from "@planview/pv-icons";
 import { ButtonEmpty } from "@planview/pv-uikit";
@@ -27,6 +28,7 @@ import { useDocumentEdits } from "@/hooks/useEdits";
 import type { DocumentItem, FolderItem, UnifiedItem } from "@/types";
 import { NameField } from "./NameField";
 import { IMAGE_MIMES } from "@/constants";
+import CommentsTab from "./Comments";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,7 +78,7 @@ const ChatFill = styled.div`
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export type DetailTab = "details" | "preview" | "chat" | "compliance" | "history";
+export type DetailTab = "details" | "preview" | "chat" | "compliance" | "history" | "comments";
 
 interface ItemDetailsPaneProps {
   item: UnifiedItem;
@@ -106,6 +108,7 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
     { id: "details", label: "Details", icon: <Info /> },
     ...(canChat ? [{ id: "chat", label: "Chat", icon: <AiAnvi color="anvi" /> }] : []),
     ...(canChat ? [{ id: "compliance", label: "Compliance", icon: <CheckmarkCircle /> }] : []),
+    ...(canChat ? [{ id: "comments", label: "Comments", icon: <Comment /> }] : []),
     ...(canChat ? [{ id: "history", label: "History", icon: <History /> }] : []),
   ];
 
@@ -241,6 +244,11 @@ export function DetailsPane({ item, activeTab: externalTab = "details", onClose 
       {activeTab === "history" && canChat && (
         <ChatFill>
           <EditHistoryList documentId={doc!.id} />
+        </ChatFill>
+      )}
+        {activeTab === "comments" && canChat && (
+        <ChatFill>
+          <CommentsTab documentId={doc!.id} />
         </ChatFill>
       )}
     </DetailsPanel>
