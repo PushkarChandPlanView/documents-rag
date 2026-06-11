@@ -55,6 +55,9 @@ export default function AppNavigationBar() {
           <NavButton $active={isActive("/compliance")} onClick={() => navigate("/compliance")}>
             Compliance
           </NavButton>
+          <NavButton $active={isActive("/agentsv1")} onClick={() => navigate("/agentsv1")}>
+            Agents
+          </NavButton>
           <NavButton $active={isActive("/sources")} onClick={() => navigate("/sources")}>
             Sources
           </NavButton>

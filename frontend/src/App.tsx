@@ -14,6 +14,7 @@ import Documents from "@/pages/Documents";
 import { Compliance } from "@/pages/Compliance";
 import { SearchBar } from "./components/search/SearchBar";
 import SourceConfig from "./pages/SourceConfig";
+import Agents from "./pages/Agents";
 import Layout from "./components/layout/Layout";
 
 export default function App() {
@@ -32,6 +33,8 @@ export default function App() {
               <Route path="/folders/:folderId" element={<Documents />} />
               <Route path="/folders/:folderId/:docId" element={<Documents />} />
               <Route path="/compliance" element={<Compliance />} />
+              <Route path="/agents" element={<Agents />} />
+              <Route path="/agentsv1" element={<Agents />} />
               <Route path="/sources" element={<SourceConfig />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

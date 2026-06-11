@@ -485,6 +485,13 @@ services:
       GW_SERVICE_PASS: ${GW_SERVICE_PASS:-changeme}
       <<: *aws-env
       BEDROCK_LLM_MODEL: ${BEDROCK_LLM_MODEL:-us.anthropic.claude-opus-4-5-20251101-v1:0}
+      PLANVIEW_BASE_URL: ${PLANVIEW_BASE_URL:-https://manohar.c.pp-dev.net}
+      PLANVIEW_CONSUMER_KEY: ${PLANVIEW_CONSUMER_KEY:-}
+      PLANVIEW_CONSUMER_SECRET: ${PLANVIEW_CONSUMER_SECRET:-}
+      PLANVIEW_OAUTH_TOKEN: ${PLANVIEW_OAUTH_TOKEN:-}
+      PLANVIEW_OAUTH_TOKEN_SECRET: ${PLANVIEW_OAUTH_TOKEN_SECRET:-}
+      PLANVIEW_PROJECT_ID: ${PLANVIEW_PROJECT_ID:-0}
+      PLANVIEW_PLAN_ID: ${PLANVIEW_PLAN_ID:-0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -492,6 +499,8 @@ services:
         condition: service_healthy
       api_gateway:
         condition: service_healthy
+    extra_hosts:
+      - "${PLANVIEW_HOST:-manohar.c.pp-dev.net}:host-gateway"
     networks: [internal]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]

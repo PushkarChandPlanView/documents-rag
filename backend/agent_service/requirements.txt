@@ -11,3 +11,5 @@ httpx==0.28.1
 boto3==1.35.80
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.20
+requests==2.32.3
+requests-oauthlib==2.0.0

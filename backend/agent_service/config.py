@@ -9,6 +9,15 @@ class Settings(BaseSettings):
     gw_service_email: str = "admin1@example.com"
     gw_service_pass: str = "changeme"
 
+    # Planview ProjectPlace — OAuth1
+    planview_base_url:              str = "https://manohar.c.pp-dev.net"
+    planview_consumer_key:          str = ""   # Client ID from developer settings
+    planview_consumer_secret:       str = ""   # Client secret from developer settings
+    planview_oauth_token:           str = ""   # OAuth1 Token
+    planview_oauth_token_secret:    str = ""   # OAuth1 Secret
+    planview_project_id:            int = 0
+    planview_plan_id:               int = 0
+
     # AWS / Bedrock
     aws_region: str = "us-east-1"
     aws_access_key_id: str = ""

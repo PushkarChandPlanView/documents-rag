@@ -177,9 +177,13 @@ const SearchPanel = ({ query, onClose }: SearchPanelProps) => {
           <ResultScore>{(r.score * 100).toFixed(0)}% match</ResultScore>
         </ResultHeader>
         <ResultMeta>
-          {r.file_type && <span>{r.file_type.toUpperCase()}</span>}
+          {(r as { source_type?: string }).source_type && (
+            <span style={{ color: "#1565c0", fontWeight: 600 }}>
+              {(r as { source_type?: string }).source_type}
+            </span>
+          )}
+          {r.file_type && <span> · {r.file_type.toUpperCase()}</span>}
           {r.page_number != null && <span> · p.{r.page_number}</span>}
-          {r.file_size_bytes != null && <span> · {(r.file_size_bytes / 1024).toFixed(0)} KB</span>}
         </ResultMeta>
         <ResultSnippet>{r.snippet}</ResultSnippet>
       </ResultCard>

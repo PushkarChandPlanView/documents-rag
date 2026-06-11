@@ -80,19 +80,50 @@ export const searchApi = {
 
   searchDocuments: async (
     query: string,
-    documentIds?: string[],
+    _documentIds?: string[],
     topK = 10
   ): Promise<DocumentSearchResponse> => {
-    const token = useAuthStore.getState().accessToken;
-    const res = await fetch(`${API_URL}/search/documents`, {
+    const { userEmail } = useAuthStore.getState();
+    const res = await fetch("/search-ui/api/search", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ query, document_ids: documentIds ?? null, top_k: topK }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        user_id: userEmail ?? "admin@example.com",
+        top_k: topK,
+        mode: "hybrid",
+        source_types: null,
+      }),
     });
     if (!res.ok) throw new Error("Document search failed");
-    return res.json();
+    const raw = await res.json() as {
+      query: string;
+      results: Array<{
+        document_id: string;
+        document_name: string;
+        file_type: string;
+        source_type: string;
+        score: number;
+        text: string;
+        page_number: number | null;
+      }>;
+    };
+    return {
+      query: raw.query,
+      results: raw.results.map((r) => ({
+        document_id: r.document_id,
+        document_name: r.document_name,
+        file_type: r.file_type,
+        score: r.score,
+        snippet: r.text,
+        page_number: r.page_number,
+        source_type: r.source_type,
+        created_at: "",
+        updated_at: "",
+        status: null,
+        description: null,
+        file_size_bytes: null,
+      })),
+    };
   },
 };

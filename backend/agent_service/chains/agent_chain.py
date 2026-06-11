@@ -26,6 +26,7 @@ from nodes.planner_node import planner_node
 from nodes.tool_executor_node import tool_executor_node
 from nodes.synthesizer_node import synthesizer_node
 from nodes.uploader_node import uploader_node
+from nodes.planview_node import planview_node
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +40,14 @@ class AgentRunState(TypedDict):
     user_id:         str
     query:           str
     system_prompt:   str
-    output_format:   str
+    output_format:   str   # "markdown" | "text" | "json" | "planview"
     enabled_tools:   list
     plan:            list
     current_step:    int
     step_results:    Annotated[list, operator.add]
     answer:          Optional[str]
     result_document_id: Optional[str]
+    planview_result: Optional[dict]
 
 
 # ── Conditional: loop tool_executor until all steps done ─────────────────────
@@ -58,20 +60,30 @@ def _should_continue(state: AgentRunState) -> str:
 
 # ── Build graph ────────────────────────────────────────────────────────────────
 
+def _after_synthesizer(state: AgentRunState) -> str:
+    """Route to planview_node or uploader based on output_format."""
+    if state.get("output_format") == "planview":
+        return "planview"
+    return "uploader"
+
+
 def _build_graph() -> StateGraph:
     g = StateGraph(AgentRunState)
     g.add_node("planner",       planner_node)
     g.add_node("tool_executor", tool_executor_node)
     g.add_node("synthesizer",   synthesizer_node)
     g.add_node("uploader",      uploader_node)
+    g.add_node("planview",      planview_node)
 
     g.add_edge(START, "planner")
     g.add_conditional_edges("planner", _should_continue,
                              {"tool_executor": "tool_executor", "synthesizer": "synthesizer"})
     g.add_conditional_edges("tool_executor", _should_continue,
                              {"tool_executor": "tool_executor", "synthesizer": "synthesizer"})
-    g.add_edge("synthesizer", "uploader")
+    g.add_conditional_edges("synthesizer", _after_synthesizer,
+                             {"uploader": "uploader", "planview": "planview"})
     g.add_edge("uploader", END)
+    g.add_edge("planview", END)
     return g
 
 
@@ -109,6 +121,7 @@ async def run_agent(
         "step_results":      [],
         "answer":            None,
         "result_document_id": None,
+        "planview_result":   None,
     }
 
     try:
@@ -145,8 +158,25 @@ async def run_agent(
                     yield _sse({"type": "uploaded", "document_id": doc_id})
                     final_state = {**(final_state or {}), **updates}
 
-        doc_id = (final_state or {}).get("result_document_id", "")
-        yield _sse({"type": "done", "document_id": doc_id})
+                elif node_name == "planview":
+                    pv = updates.get("planview_result", {})
+                    yield _sse({
+                        "type":        "planview_done",
+                        "board_id":    pv.get("board_id"),
+                        "board_name":  pv.get("board_name"),
+                        "activities":  len(pv.get("activities", [])),
+                        "total_cards": pv.get("total_cards", 0),
+                        "errors":      pv.get("errors", []),
+                    })
+                    final_state = {**(final_state or {}), **updates}
+
+        fs = final_state or {}
+        doc_id = fs.get("result_document_id", "")
+        pv_result = fs.get("planview_result")
+        payload: dict = {"type": "done", "document_id": doc_id}
+        if pv_result:
+            payload["planview_result"] = pv_result
+        yield _sse(payload)
 
     except Exception as exc:
         logger.error("Agent chain error: %s", exc, exc_info=True)
