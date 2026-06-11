@@ -56,6 +56,7 @@ class ESChunk:
     page_number: Optional[int]
     document_name: str
     file_type: str
+    source_type: str = ""
     latency_ms: int = 0
 
 
@@ -200,6 +201,7 @@ async def _execute(body: dict, top_k: int) -> list[ESChunk]:
             page_number=src.get("page_number"),
             document_name=src.get("document_name", ""),
             file_type=src.get("file_type", ""),
+            source_type=src.get("source_type", ""),
             latency_ms=latency_ms,
         ))
 

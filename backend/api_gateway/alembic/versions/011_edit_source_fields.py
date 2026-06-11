@@ -1,13 +1,13 @@
 """add mime_type and raw_minio_key to document_edits
 
-Revision ID: 008
-Revises: 007
-Create Date: 2025-01-01 00:00:00.000000
+Revision ID: 011
+Revises: 010
+Create Date: 2026-06-11
 """
 from alembic import op
 
-revision = "008"
-down_revision = "007"
+revision = "011"
+down_revision = "010"
 branch_labels = None
 depends_on = None
 

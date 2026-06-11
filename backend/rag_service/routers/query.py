@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from chains import rag_chain
 from chains.agentic_chain import run_agentic_search
-from services import context_builder, llm_client, retriever
+from services import context_builder, llm_client
 from services import es_retriever
 
 logger = logging.getLogger(__name__)
@@ -128,14 +128,45 @@ async def agentic_query(request: AgenticQueryRequest):
 @router.post("/search")
 async def search(request: SearchRequest):
     """Semantic search without LLM generation."""
-    query_embedding = await llm_client.embed(request.query)
-    chunks = await retriever.retrieve(
-        query_embedding=query_embedding,
-        user_id=request.user_id,
-        document_ids=request.document_ids,
-        top_k=request.top_k,
-        query=request.query,
-    )
+    mode = request.mode
+
+    if mode in ("hybrid", "semantic"):
+        query_vector = await llm_client.embed(request.query)
+    else:
+        query_vector = []
+
+    if mode == "keyword":
+        chunks = await es_retriever.keyword_search(
+            query_text=request.query,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
+        )
+    elif mode == "semantic":
+        chunks = await es_retriever.semantic_search(
+            query_vector=query_vector,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
+        )
+    else:  # hybrid (default) or pgvector fallback
+        chunks = await es_retriever.hybrid_search(
+            query_text=request.query,
+            query_vector=query_vector,
+            user_id=request.user_id,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            source_types=request.source_types,
+            file_types=request.file_types,
+            folder_id=request.folder_id,
+        )
+
     return {
         "query": request.query,
         "mode": request.mode,
@@ -148,6 +179,7 @@ async def search(request: SearchRequest):
                 "page_number": c.page_number,
                 "document_name": c.document_name,
                 "file_type": c.file_type,
+                "source_type": c.source_type,
                 "latency_ms": c.latency_ms,
             }
             for c in chunks

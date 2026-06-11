@@ -10,7 +10,7 @@ Usage:
     python scripts/seed_data.py --reset --seed          # delete then reseed
     python scripts/seed_data.py --wait                  # seed + wait for processing to complete
     python scripts/seed_data.py --base-url http://localhost:8081
-    python scripts/seed_data.py --email admin@example.com --password changeme
+    python scripts/seed_data.py --email admin1@example.com --password changeme
 
 Company: Forge — unified project management + CRM + customer support SaaS.
 
@@ -117,7 +117,7 @@ def main():
                         help="Wait for all documents to finish processing (COMPLETED/FAILED)")
     parser.add_argument("--base-url", default="http://localhost:8081",
                         help="Base URL of the nginx proxy (default: http://localhost:8081)")
-    parser.add_argument("--email", default="admin@example.com")
+    parser.add_argument("--email", default="admin1@example.com")
     parser.add_argument("--password", default="changeme")
     args = parser.parse_args()
 
