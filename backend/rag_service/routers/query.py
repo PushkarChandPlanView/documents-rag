@@ -127,78 +127,15 @@ async def agentic_query(request: AgenticQueryRequest):
 
 @router.post("/search")
 async def search(request: SearchRequest):
-    """
-    Search document chunks without LLM generation.
-
-    Modes:
-      hybrid   — BM25 + kNN fused with RRF via Elasticsearch (default)
-      semantic — pure kNN via Elasticsearch
-      keyword  — pure BM25 via Elasticsearch
-      pgvector — original pgvector hybrid scoring (fallback / no ES required)
-    """
-    if request.mode == "pgvector":
-        # Original pgvector path — always available as fallback
-        query_embedding = await llm_client.embed(request.query)
-        chunks = await retriever.retrieve(
-            query_embedding=query_embedding,
-            user_id=request.user_id,
-            document_ids=request.document_ids,
-            top_k=request.top_k,
-            query=request.query,
-        )
-        return {
-            "query": request.query,
-            "mode": "pgvector",
-            "results": [
-                {
-                    "chunk_id": c.chunk_id,
-                    "document_id": c.document_id,
-                    "text": c.text,
-                    "score": round(c.score, 4),
-                    "page_number": c.page_number,
-                    "document_name": c.document_name,
-                    "file_type": c.file_type,
-                }
-                for c in chunks
-            ],
-        }
-
-    # Elasticsearch paths
-    if request.mode == "keyword":
-        es_chunks = await es_retriever.keyword_search(
-            query_text=request.query,
-            user_id=request.user_id,
-            document_ids=request.document_ids,
-            top_k=request.top_k,
-            source_types=request.source_types,
-            file_types=request.file_types,
-            folder_id=request.folder_id,
-        )
-    else:
-        # hybrid (default) or semantic both need an embedding
-        query_embedding = await llm_client.embed(request.query)
-        if request.mode == "semantic":
-            es_chunks = await es_retriever.semantic_search(
-                query_vector=query_embedding,
-                user_id=request.user_id,
-                document_ids=request.document_ids,
-                top_k=request.top_k,
-                source_types=request.source_types,
-                file_types=request.file_types,
-                folder_id=request.folder_id,
-            )
-        else:
-            es_chunks = await es_retriever.hybrid_search(
-                query_text=request.query,
-                query_vector=query_embedding,
-                user_id=request.user_id,
-                document_ids=request.document_ids,
-                top_k=request.top_k,
-                source_types=request.source_types,
-                file_types=request.file_types,
-                folder_id=request.folder_id,
-            )
-
+    """Semantic search without LLM generation."""
+    query_embedding = await llm_client.embed(request.query)
+    chunks = await retriever.retrieve(
+        query_embedding=query_embedding,
+        user_id=request.user_id,
+        document_ids=request.document_ids,
+        top_k=request.top_k,
+        query=request.query,
+    )
     return {
         "query": request.query,
         "mode": request.mode,

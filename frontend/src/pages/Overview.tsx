@@ -4,7 +4,6 @@ import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { Toolbar, ToolbarSectionLeft, ToolbarSectionRight, ToolbarButtonEmpty } from "@planview/pv-toolbar";
 import { Help } from "@planview/pv-icons";
-import Layout from "@/components/layout/Layout";
 import { DashboardStats } from "@/components/compliance/DashboardStats";
 import { IssuesList } from "@/components/compliance/IssuesList";
 import { useComplianceStats } from "@/hooks/useCompliance";
@@ -130,7 +129,7 @@ export default function Overview() {
   };
 
   return (
-    <Layout>
+    <>
       <PageWrapper>
         <Toolbar label="Overview toolbar">
           <ToolbarSectionLeft>
@@ -179,6 +178,6 @@ export default function Overview() {
           </Section>
         </Body>
       </PageWrapper>
-    </Layout>
+    </>
   );
 }

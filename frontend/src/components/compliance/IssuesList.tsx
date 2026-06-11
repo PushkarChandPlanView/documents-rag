@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { color, spacing, text } from "@planview/pv-utilities";
-import { Grid, GridCellBase } from "@planview/pv-grid";
+import { color, cursor, overflow, spacing, text } from "@planview/pv-utilities";
+import { Grid, GridCellBase, useLocalStoragePreferences } from "@planview/pv-grid";
 import type { Column, GridRowMeta } from "@planview/pv-grid";
 import { ButtonEmpty, Chip } from "@planview/pv-uikit";
 import { Warning } from "@planview/pv-icons";
 import { useComplianceIssues } from "@/hooks/useCompliance";
 import type { ComplianceIssueFailedRule, ComplianceIssueItem, ComplianceStatus } from "@/types/compliance";
+import { useIntl } from "react-intl";
 
 // ── Row model ─────────────────────────────────────────────────────────────────
 
@@ -46,18 +47,15 @@ const GridWrapper = styled.div`
   min-height: 0;
 `;
 
-const DocNameBtn = styled.button`
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  ${text.small};
-  font-weight: 600;
-  color: ${color.backgroundPrimary};
-  text-align: left;
-  &:hover {
-    text-decoration: underline;
-  }
+const DocName = styled.a`
+    ${text.regular};
+    color: ${color.textInfo};
+    text-decoration: none;
+    ${cursor.pointer}
+    ${overflow.ellipsis()}
+    &:hover {
+        text-decoration: underline;
+    }
 `;
 
 
@@ -79,15 +77,11 @@ const Empty = styled.div`
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
-}
 
 function buildGridData(items: ComplianceIssueItem[]) {
   const ids: string[] = [];
   const data = new Map<string, IssueRow>();
   const meta = new Map<string, IssueRowMeta>();
-
   items.forEach((item) => {
     const row: IssueRow = {
       id: item.report_id,
@@ -115,6 +109,8 @@ interface Props {
 
 export function IssuesList({ statusFilter }: Props) {
   const navigate = useNavigate();
+  const intl = useIntl();
+  const preferencesAdapter = useLocalStoragePreferences("issues-list-grid", "v1");
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useComplianceIssues(
     statusFilter ?? undefined,
   );
@@ -137,14 +133,11 @@ export function IssuesList({ statusFilter }: Props) {
             if (!row) return <></>;
             return (
               <GridCellBase tabIndex={tabIndex}>
-                <DocNameBtn
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/documents/${row.documentId}`);
-                  }}
+                <DocName
+                  href={`/documents/${row.documentId}`}
                 >
                   {row.documentName}
-                </DocNameBtn>
+                </DocName>
               </GridCellBase>
             );
           },
@@ -175,17 +168,19 @@ export function IssuesList({ statusFilter }: Props) {
         id: "checkedAt",
         label: "Checked",
         width: 150,
-        cell: {
-          Renderer: ({ rowId, tabIndex }) => {
-            const row = gridData.data.get(String(rowId));
-            if (!row) return <></>;
-            return (
-              <GridCellBase tabIndex={tabIndex}>
-                <span style={{ fontSize: 12, color: color.textSecondary }}>{fmtDate(row.checkedAt)}</span>
-              </GridCellBase>
-            );
-          },
-        },
+               cell: {
+                 Renderer: ({ value, tabIndex }) => {
+                   const isCurrentYear = new Date(value).getFullYear() === new Date().getFullYear();
+                   return (
+                     <GridCellBase tabIndex={tabIndex}>
+                       {intl.formatDate(value, isCurrentYear
+                         ? { day: "numeric", month: "short" }
+                         : { day: "numeric", month: "short", year: "numeric" }
+                       )}
+                     </GridCellBase>
+                   );
+                 },
+               },
       },
       {
         id: "failingRules",
@@ -214,7 +209,7 @@ export function IssuesList({ statusFilter }: Props) {
         },
       },
     ],
-    [gridData, navigate],
+    [gridData, intl, navigate],
   );
 
   if (isLoading) return <Empty>Loading issues…</Empty>;
@@ -230,6 +225,7 @@ export function IssuesList({ statusFilter }: Props) {
           loading={isLoading}
           rowHeight="medium"
           selectionMode="none"
+          preferencesAdapter={preferencesAdapter}
           onRowClick={(rowId) => {
             const row = gridData.data.get(String(rowId));
             if (row) navigate(`/documents/${row.documentId}`);

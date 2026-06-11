@@ -1,7 +1,7 @@
-import React from "react";
 import styled from "styled-components";
 import { color } from "@planview/pv-utilities";
 import AppNavigationBar from "./AppNavigationBar";
+import { Outlet } from "react-router-dom";
 
 const Wrapper = styled.div`
   display: flex;
@@ -20,11 +20,13 @@ const Main = styled.main`
   box-sizing: border-box;
 `;
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout() {
   return (
     <Wrapper>
       <AppNavigationBar />
-      <Main>{children}</Main>
+      <Main>
+        <Outlet />
+      </Main>
     </Wrapper>
   );
 }

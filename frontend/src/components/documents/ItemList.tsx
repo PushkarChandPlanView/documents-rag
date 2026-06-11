@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { useIntl } from "react-intl";
 import styled from "styled-components";
 import { color, spacing } from "@planview/pv-utilities";
-import { Grid, GridCellBase } from "@planview/pv-grid";
+import { Grid, GridCellBase, useLocalStoragePreferences } from "@planview/pv-grid";
 import type { Column } from "@planview/pv-grid";
 import type { GridRowMeta } from "@planview/pv-grid";
 import { Chip, DESTRUCTIVE, Modal } from "@planview/pv-uikit";
@@ -227,8 +228,10 @@ interface ItemListProps {
   filters?: ItemFiltersState;
   parentId?: string;
 }
-
+const columnSchemaVersion = "v2";
 export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filters, parentId }: ItemListProps) {
+  const intl = useIntl();
+  const preferencesAdapter = useLocalStoragePreferences("itemlist-grid", columnSchemaVersion);
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useDocuments(parentId);
   const { mutate: deleteDoc } = useDeleteDocument();
   const { mutate: deleteFolder } = useDeleteFolder();
@@ -377,6 +380,19 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
         id: "uploadedAt",
         label: "Uploaded",
         width: 120,
+        cell: {
+          Renderer: ({ value, tabIndex }) => {
+            const isCurrentYear = new Date(value).getFullYear() === new Date().getFullYear();
+            return (
+              <GridCellBase tabIndex={tabIndex}>
+                {intl.formatDate(value, isCurrentYear
+                  ? { day: "numeric", month: "short" }
+                  : { day: "numeric", month: "short", year: "numeric" }
+                )}
+              </GridCellBase>
+            );
+          },
+        },
       },
       {
         id: "chat",
@@ -402,7 +418,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
         },
       },
     ],
-    [gridData, onChatOpen, onFolderOpen],
+    [gridData, intl, onChatOpen, onFolderOpen],
   );
 
   const selection = selectedId ? new Set([selectedId]) : new Set<string>();
@@ -415,6 +431,7 @@ export function ItemList({ onSelect, onChatOpen, onFolderOpen, selectedId, filte
           columns={columns}
           rows={gridData}
           loading={isLoading && !data}
+          preferencesAdapter={preferencesAdapter}
           expandedRows={expandedRows}
           onExpandedRowsChange={(next) => {
             const newFolderIds = [...next]

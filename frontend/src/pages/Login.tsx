@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { borderRadius, color, shadow, spacing, text } from "@planview/pv-utilities";
+import { Input } from "@planview/pv-form";
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/authStore";
 
@@ -45,26 +46,6 @@ const TabButton = styled.button<{ $active: boolean }>`
   margin-bottom: -2px;
 `;
 
-const FieldGroup = styled.div<{ $mb?: string }>`
-  margin-bottom: ${({ $mb }) => $mb ?? `${spacing.small}px`};
-`;
-
-const Label = styled.label`
-  display: block;
-  margin-bottom: ${spacing.xsmall}px;
-  ${text.regular};
-  color: ${color.textPrimary};
-`;
-
-const StyledInput = styled.input`
-  width: 100%;
-  padding: ${spacing.xsmall}px;
-  border: 1px solid ${color.borderLight};
-  ${borderRadius.small()};
-  ${text.regular};
-  box-sizing: border-box;
-`;
-
 const ErrorText = styled.p`
   color: ${color.textError};
   margin-bottom: ${spacing.small}px;
@@ -86,6 +67,8 @@ const SubmitButton = styled.button<{ $loading: boolean }>`
 export default function Login() {
   const navigate = useNavigate();
   const setTokens = useAuthStore((s) => s.setTokens);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -98,7 +81,7 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "register") {
-        await authApi.register(email, password);
+        await authApi.register(email, password, firstName, lastName);
       }
       const tokens = await authApi.login(email, password);
       setTokens(tokens.access_token, tokens.refresh_token, email);
@@ -122,14 +105,26 @@ export default function Login() {
           ))}
         </TabRow>
         <form onSubmit={handleSubmit}>
-          <FieldGroup>
-            <Label>Email</Label>
-            <StyledInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </FieldGroup>
-          <FieldGroup $mb="1.5rem">
-            <Label>Password</Label>
-            <StyledInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </FieldGroup>
+          {mode === "register" && (
+            <>
+              <Input
+                label="First Name"
+                value={firstName}
+                onChange={(value) => setFirstName(value)}
+                placeholder="First name"
+                withAsterisk
+              />
+              <Input
+                label="Last Name"
+                value={lastName}
+                onChange={(value) => setLastName(value)}
+                placeholder="Last name"
+                withAsterisk
+              />
+            </>
+          )}
+          <Input label="Email"    type="email"    value={email}    onChange={(value) => setEmail(value)}    placeholder="you@example.com" withAsterisk />
+          <Input label="Password" type="password" value={password} onChange={(value) => setPassword(value)} placeholder="••••••••" withAsterisk />
           {error && <ErrorText>{error}</ErrorText>}
           <SubmitButton type="submit" disabled={loading} $loading={loading}>
             {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}

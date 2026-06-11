@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import styled from "styled-components";
 import { ContentLayout } from "@planview/pv-uikit";
-import Layout from "@/components/layout/Layout";
 import { ItemList } from "@/components/documents/ItemList";
 import { DetailsPane } from "@/components/documents/detailspane";
 import { ItemFilters } from "@/components/documents/ItemFilters";
@@ -86,7 +85,7 @@ export default function Documents() {
   };
 
   return (
-    <Layout>
+    <>
       <PageWrapper>
         <ItemToolbar
           onToggleFilter={() => setFilterOpen((v) => !v)}
@@ -135,6 +134,6 @@ export default function Documents() {
       <FileUploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} folderId={folderId} />
       <CreateFolderDialog open={createFolderOpen} onClose={() => setCreateFolderOpen(false)} parentId={folderId} />
       <AddLinkDialog open={addLinkOpen} onClose={() => setAddLinkOpen(false)} folderId={folderId} />
-    </Layout>
+    </>
   );
 }

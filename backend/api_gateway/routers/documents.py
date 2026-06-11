@@ -7,8 +7,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import Response as FastAPIResponse
-from sqlalchemy import select as sa_select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from models.edit import DocumentEdit
 
 from config import get_settings
 from dependencies import get_current_user, get_db
@@ -258,35 +259,58 @@ async def stream_document_file(
     if not item.minio_key:
         raise HTTPException(status_code=400, detail="This document has no file (web link only)")
 
-    # If the document has approved edits, serve the updated processed text
-    # instead of the original raw file so the preview reflects current content.
-    approved_edit = (await db.execute(
-        sa_select(DocumentEdit)
-        .where(DocumentEdit.document_id == document_id, DocumentEdit.status == "approved")
-        .order_by(DocumentEdit.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+    # Serve the most up-to-date file
+    approved_edit = (
+        await db.execute(
+            select(DocumentEdit)
+            .where(
+                DocumentEdit.document_id == document_id,
+                DocumentEdit.status == "approved",
+            )
+            .order_by(DocumentEdit.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if approved_edit and approved_edit.raw_minio_key:
+        # Source file was actually updated — serve it from the raw bucket
+        raw_bytes = storage_service.download_file(
+            settings.minio_bucket_raw, approved_edit.raw_minio_key
+        )
+        filename = (item.name or "file").replace('"', "")
+        return FastAPIResponse(
+            content=raw_bytes,
+            media_type=approved_edit.mime_type or "application/octet-stream",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Content-Length": str(len(raw_bytes)),
+                "Cache-Control": "private, max-age=300",
+            },
+        )
 
     if approved_edit:
+        # Text-only fallback — serve the edited plain-text
         text_key = f"{document_id}/text.txt"
-        try:
-            file_bytes = storage_service.download_file(settings.minio_bucket_processed, text_key)
-            mime = "text/plain"
-            base_name = (item.name or "document").rsplit(".", 1)[0]
-            filename = f"{base_name}_edited.txt"
-        except Exception:
-            # Processed file unavailable — fall back to the raw original
-            file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
-            mime = item.mime_type or "application/octet-stream"
-            filename = (item.name or "file").replace('"', "")
-    else:
-        file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
-        mime = item.mime_type or "application/octet-stream"
-        filename = (item.name or "file").replace('"', "")
+        text_bytes = storage_service.download_file(
+            settings.minio_bucket_processed, text_key
+        )
+        base_name = (item.name or "document").rsplit(".", 1)[0]
+        return FastAPIResponse(
+            content=text_bytes,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f'inline; filename="{base_name}_edited.txt"',
+                "Content-Length": str(len(text_bytes)),
+                "Cache-Control": "private, max-age=300",
+            },
+        )
 
+    # No approved edit — serve the original raw file
+    file_bytes = storage_service.download_file(settings.minio_bucket_raw, item.minio_key)
+    filename = (item.name or "file").replace('"', "")
     return FastAPIResponse(
         content=file_bytes,
-        media_type=mime,
+        media_type=item.mime_type or "application/octet-stream",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
             "Content-Length": str(len(file_bytes)),

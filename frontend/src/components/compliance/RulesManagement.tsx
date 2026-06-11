@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useMemo, useState } from "react";
 import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
-import { Grid, GridCellBase } from "@planview/pv-grid";
+import { Grid, GridCellBase, useLocalStoragePreferences } from "@planview/pv-grid";
 import type { Column, GridRowMeta } from "@planview/pv-grid";
 import { Checkbox, Chip, DESTRUCTIVE, ListItem, Modal } from "@planview/pv-uikit";
 import { Edit, Trash } from "@planview/pv-icons";
@@ -54,7 +54,7 @@ const ChangedDot = styled.span`
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #e65100;
+  background: ${color.error100};
   flex-shrink: 0;
 `;
 
@@ -78,6 +78,7 @@ interface Props {
 export function RulesManagement({ isAdmin, pending, setPending, showCreate, onCloseCreate }: Props) {
   const { data: rules = [], isLoading } = useComplianceRules();
   const { mutate: deleteRule } = useDeleteRule();
+  const preferencesAdapter = useLocalStoragePreferences("rules-management-grid", "v1");
   const [editRule, setEditRule] = useState<ComplianceRule | null>(null);
 
   // Build grid rows — reflects pending toggles immediately
@@ -221,6 +222,7 @@ export function RulesManagement({ isAdmin, pending, setPending, showCreate, onCl
           loading={isLoading}
           rowHeight="medium"
           selectionMode="none"
+          preferencesAdapter={preferencesAdapter}
           actionsMenu={
             isAdmin
               ? ({ row }) => (
