@@ -150,7 +150,7 @@ async def create_folder_item(
 
 async def get_item(db: AsyncSession, item_id: UUID, user_id: UUID) -> Optional[Item]:
     result = await db.execute(
-        select(ItemModel).where(ItemModel.id == item_id, ItemModel.user_id == user_id)
+        select(ItemModel).where(ItemModel.id == item_id)
     )
     return result.scalar_one_or_none()
 
@@ -165,7 +165,6 @@ async def get_documents_by_ids(
     result = await db.execute(
         select(ItemModel).where(
             ItemModel.id.in_(document_ids),
-            ItemModel.user_id == user_id,
             ItemModel.type == "document",
         )
     )
@@ -177,7 +176,7 @@ async def get_document_detail(
 ) -> Optional[DocumentDetailResponse]:
     result = await db.execute(
         select(ItemModel)
-        .where(ItemModel.id == item_id, ItemModel.user_id == user_id, ItemModel.type == "document")
+        .where(ItemModel.id == item_id, ItemModel.type == "document")
         .options(selectinload(ItemModel.processing_jobs), selectinload(ItemModel.parent))
     )
     item = result.scalar_one_or_none()
@@ -249,13 +248,12 @@ async def list_unified(
     if parent_id is not None:
         base = (
             select(ItemModel.id)
-            .where(ItemModel.parent_id == parent_id, ItemModel.user_id == user_id)
+            .where(ItemModel.parent_id == parent_id)
         )
         cte = base.cte(recursive=True)
         rec = (
             select(ItemModel.id)
             .join(cte, ItemModel.parent_id == cte.c.id)
-            .where(ItemModel.user_id == user_id)
         )
         cte = cte.union_all(rec)
 
@@ -273,7 +271,6 @@ async def list_unified(
 
     stmt = (
         select(ItemModel)
-        .where(ItemModel.user_id == user_id)
         .options(selectinload(ItemModel.parent), selectinload(ItemModel.processing_jobs))
         .order_by(ItemModel.created_at.desc(), ItemModel.id.desc())
     )
