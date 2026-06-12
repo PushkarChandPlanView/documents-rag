@@ -23,6 +23,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      "/agent-ui": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+      },
     },
   },
   build: {

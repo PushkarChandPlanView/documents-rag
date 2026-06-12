@@ -7,6 +7,7 @@ import { CheckmarkCircleFilled, CrossCircleFilled } from "@planview/pv-icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { editsApi } from "@/api/edits";
+import { showMessage } from "@planview/pv-uikit";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -39,12 +40,29 @@ const MarkdownContent = styled.div`
   color: ${color.textPrimary};
   line-height: 1.6;
 
-  p { margin: 0 0 ${spacing.xsmall}px; }
-  p:last-child { margin-bottom: 0; }
-  h1, h2, h3 { margin: ${spacing.small}px 0 ${spacing.xsmall}px; font-weight: 600; }
-  ul, ol { margin: 0 0 ${spacing.xsmall}px; padding-left: ${spacing.medium}px; }
-  li { margin-bottom: 2px; }
-  strong { font-weight: 600; }
+  p {
+    margin: 0 0 ${spacing.xsmall}px;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+  h1,
+  h2,
+  h3 {
+    margin: ${spacing.small}px 0 ${spacing.xsmall}px;
+    font-weight: 600;
+  }
+  ul,
+  ol {
+    margin: 0 0 ${spacing.xsmall}px;
+    padding-left: ${spacing.medium}px;
+  }
+  li {
+    margin-bottom: 2px;
+  }
+  strong {
+    font-weight: 600;
+  }
   code {
     font-family: monospace;
     font-size: 0.85em;
@@ -65,9 +83,21 @@ const MarkdownContent = styled.div`
     color: ${color.textSecondary};
     margin: 0 0 ${spacing.xsmall}px;
   }
-  table { width: 100%; border-collapse: collapse; margin: 0 0 ${spacing.xsmall}px; }
-  th { text-align: left; padding: ${spacing.xsmall}px ${spacing.small}px; border-bottom: 2px solid ${color.borderNormal}; font-weight: 600; }
-  td { padding: ${spacing.xsmall}px ${spacing.small}px; border-bottom: 1px solid ${color.borderLight}; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 ${spacing.xsmall}px;
+  }
+  th {
+    text-align: left;
+    padding: ${spacing.xsmall}px ${spacing.small}px;
+    border-bottom: 2px solid ${color.borderNormal};
+    font-weight: 600;
+  }
+  td {
+    padding: ${spacing.xsmall}px ${spacing.small}px;
+    border-bottom: 1px solid ${color.borderLight};
+  }
 `;
 
 const FooterRow = styled.div`
@@ -100,11 +130,16 @@ export function EditDiffModal({
   onStatusChange,
 }: Props) {
   const qc = useQueryClient();
+
   const [localStatus, setLocalStatus] = useState(initialStatus);
 
   const { mutate: approve, isPending: approving } = useMutation({
     mutationFn: () => editsApi.approve(documentId, editId),
     onSuccess: () => {
+      showMessage({
+        type: "success",
+        message: "Edit approved successfully.",
+      });
       setLocalStatus("approved");
       onStatusChange("approved");
       qc.invalidateQueries({ queryKey: ["document", documentId] });
@@ -127,7 +162,9 @@ export function EditDiffModal({
 
   const Footer = () => (
     <FooterRow>
-      <ButtonEmpty onClick={onClose} disabled={busy}>Close</ButtonEmpty>
+      <ButtonEmpty onClick={onClose} disabled={busy}>
+        Close
+      </ButtonEmpty>
       {localStatus === "pending" && (
         <>
           <ButtonDestructive
@@ -150,12 +187,7 @@ export function EditDiffModal({
   );
 
   return (
-    <Modal
-      headerText="Review Proposed Changes"
-      size={MODAL_LARGE}
-      onCancel={onClose}
-      Footer={Footer}
-    >
+    <Modal headerText="Review Proposed Changes" size={MODAL_LARGE} onCancel={onClose} Footer={Footer}>
       <ModalBody>
         <Instruction>
           <strong>Requested:</strong> {instruction}

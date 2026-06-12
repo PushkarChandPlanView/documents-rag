@@ -11,6 +11,8 @@ Routes:
   POST /agent-ui/api/agents/<id>/run  SSE proxy → agent_service POST /agents/{id}/run
   GET  /agent-ui/api/runs/<run_id>    proxy → agent_service GET /agents/runs/{run_id}
 """
+import base64
+import json
 import logging
 import os
 
@@ -23,6 +25,19 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://agent_service:8002")
+
+
+def _user_id_from_token() -> str | None:
+    """Extract user_id (sub claim) from the Bearer JWT without verifying signature."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    try:
+        payload_b64 = auth.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)  # re-pad
+        return json.loads(base64.urlsafe_b64decode(payload_b64)).get("sub")
+    except Exception:
+        return None
 
 
 # ── UI pages ──────────────────────────────────────────────────────────────────
@@ -60,8 +75,10 @@ def api_list_agents():
 @app.post("/agent-ui/api/agents")
 def api_create_agent():
     try:
-        r = http.post(f"{AGENT_SERVICE_URL}/agents",
-                      json=request.get_json(silent=True) or {}, timeout=10)
+        body = request.get_json(silent=True) or {}
+        if "user_id" not in body:
+            body["user_id"] = _user_id_from_token() or "anonymous"
+        r = http.post(f"{AGENT_SERVICE_URL}/agents", json=body, timeout=10)
         return Response(r.content, status=r.status_code,
                         content_type=r.headers.get("Content-Type", "application/json"))
     except Exception as exc:
@@ -94,6 +111,8 @@ def api_delete_agent(agent_id):
 @app.post("/agent-ui/api/agents/<agent_id>/run")
 def api_run_agent(agent_id):
     body = request.get_json(silent=True) or {}
+    if "user_id" not in body:
+        body["user_id"] = _user_id_from_token() or "anonymous"
     try:
         upstream = http.post(
             f"{AGENT_SERVICE_URL}/agents/{agent_id}/run",

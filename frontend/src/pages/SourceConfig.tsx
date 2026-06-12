@@ -201,16 +201,16 @@ function JiraForm({ onSubmit, submitting }: FormProps) {
   return (
     <FormCard>
       <FormGrid>
-        <TF id="jira-key"     label="Key *"        placeholder="SUP-1234"           value={f.v("key")}     onChange={f.s("key")} />
-        <TF id="jira-project" label="Project *"    placeholder="customer-support"   value={f.v("project")} onChange={f.s("project")} />
+        <TF id="jira-key"     label="Key *"        placeholder="PP-1042"                        value={f.v("key")}     onChange={f.s("key")} />
+        <TF id="jira-project" label="Project *"    placeholder="projectplace-platform"          value={f.v("project")} onChange={f.s("project")} />
         <SF id="jira-type"    label="Issue Type *" value={f.v("issue_type") || "Bug"} onChange={f.s("issue_type")} options={ISSUE_TYPES} />
         <SF id="jira-status"  label="Status"       value={f.v("status") || "Open"}   onChange={f.s("status")}     options={STATUSES} />
         <SF id="jira-priority" label="Priority"    value={f.v("priority") || "P2"}   onChange={f.s("priority")}   options={PRIORITIES} />
-        <TF id="jira-reporter" label="Reporter"    placeholder="name@corp.com"       value={f.v("reporter")} onChange={f.s("reporter")} />
-        <FullWidth><TF id="jira-summary" label="Summary *" placeholder="Short description" value={f.v("summary")} onChange={f.s("summary")} /></FullWidth>
-        <FullWidth><TAF id="jira-desc"   label="Description *" rows={5} placeholder="Full issue description…" value={f.v("description")} onChange={f.s("description")} /></FullWidth>
-        <FullWidth><TF id="jira-labels"  label="Labels (comma-separated)" placeholder="backend, performance" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
-        <FullWidth><TAF id="jira-comments" label='Comments (one per line: "user: text")' rows={3} placeholder={"Alice: Initial triage.\nBob: Root cause identified."} value={f.v("comments")} onChange={f.s("comments")} /></FullWidth>
+        <TF id="jira-reporter" label="Reporter"    placeholder="name@planview.com"              value={f.v("reporter")} onChange={f.s("reporter")} />
+        <FullWidth><TF id="jira-summary" label="Summary *" placeholder="Milestone dates not syncing on project board" value={f.v("summary")} onChange={f.s("summary")} /></FullWidth>
+        <FullWidth><TAF id="jira-desc"   label="Description *" rows={5} placeholder="Steps to reproduce, expected vs actual behaviour in Projectplace…" value={f.v("description")} onChange={f.s("description")} /></FullWidth>
+        <FullWidth><TF id="jira-labels"  label="Labels (comma-separated)" placeholder="board, milestone, card" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
+        <FullWidth><TAF id="jira-comments" label='Comments (one per line: "user: text")' rows={3} placeholder={"Alice: Reproduced on Q3 roadmap board.\nBob: Root cause in milestone date recalculation."} value={f.v("comments")} onChange={f.s("comments")} /></FullWidth>
       </FormGrid>
       <FormActions>
         <ButtonEmpty onClick={f.reset}>Clear</ButtonEmpty>
@@ -235,13 +235,13 @@ function ConfluenceForm({ onSubmit, submitting }: FormProps) {
   return (
     <FormCard>
       <FormGrid>
-        <TF id="conf-title"  label="Title *"  placeholder="autoscaler-runbook-2026"  value={f.v("title")}  onChange={f.s("title")} />
-        <TF id="conf-space"  label="Space *"  placeholder="engineering"              value={f.v("space")}  onChange={f.s("space")} />
-        <TF id="conf-author" label="Author"   placeholder="name@corp.com"            value={f.v("author")} onChange={f.s("author")} />
+        <TF id="conf-title"  label="Title *"  placeholder="Projectplace Board Configuration Guide"  value={f.v("title")}  onChange={f.s("title")} />
+        <TF id="conf-space"  label="Space *"  placeholder="projectplace-docs"                       value={f.v("space")}  onChange={f.s("space")} />
+        <TF id="conf-author" label="Author"   placeholder="name@planview.com"                       value={f.v("author")} onChange={f.s("author")} />
         <SF id="conf-status"          label="Status"          value={f.v("status") || "published"}          onChange={f.s("status")}          options={STATUSES} />
         <SF id="conf-confidentiality" label="Confidentiality" value={f.v("confidentiality") || "internal"}  onChange={f.s("confidentiality")} options={CONFIDENTIALITY} />
-        <FullWidth><TAF id="conf-content" label="Content *" rows={8} placeholder="Full page body…" value={f.v("content")} onChange={f.s("content")} /></FullWidth>
-        <FullWidth><TF id="conf-labels" label="Labels (comma-separated)" placeholder="runbook, autoscaler" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
+        <FullWidth><TAF id="conf-content" label="Content *" rows={8} placeholder="How to set up boards, manage cards and milestones in Projectplace…" value={f.v("content")} onChange={f.s("content")} /></FullWidth>
+        <FullWidth><TF id="conf-labels" label="Labels (comma-separated)" placeholder="projectplace, board, milestone" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
       </FormGrid>
       <FormActions>
         <ButtonEmpty onClick={f.reset}>Clear</ButtonEmpty>
@@ -268,15 +268,15 @@ function HubSpotForm({ onSubmit, submitting }: FormProps) {
   return (
     <FormCard>
       <FormGrid>
-        <TF id="hs-name"   label="Company Name *"   placeholder="Acme Corp"  value={f.v("company_name")}   onChange={f.s("company_name")} />
-        <TF id="hs-domain" label="Company Domain *" placeholder="acme.com"   value={f.v("company_domain")} onChange={f.s("company_domain")} />
-        <SF id="hs-stage"  label="Stage"            value={f.v("stage") || "lead"}        onChange={f.s("stage")}        options={STAGES} />
+        <TF id="hs-name"   label="Company Name *"   placeholder="Contoso Ltd"      value={f.v("company_name")}   onChange={f.s("company_name")} />
+        <TF id="hs-domain" label="Company Domain *" placeholder="contoso.com"      value={f.v("company_domain")} onChange={f.s("company_domain")} />
+        <SF id="hs-stage"  label="Stage"            value={f.v("stage") || "lead"} onChange={f.s("stage")}        options={STAGES} />
         <SF id="hs-tier"   label="Account Tier"     value={f.v("account_tier") || "startup"} onChange={f.s("account_tier")} options={TIERS} />
-        <TF id="hs-industry" label="Industry"       placeholder="SaaS"       value={f.v("industry")}  onChange={f.s("industry")} />
-        <TF id="hs-contacts" label="Contacts (comma-separated)" placeholder="Alice (CEO), Bob (CTO)" value={f.v("contacts")} onChange={f.s("contacts")} />
-        <FullWidth><TAF id="hs-notes" label="Notes" rows={6} placeholder="Account notes, deal context, escalation history…" value={f.v("notes")} onChange={f.s("notes")} /></FullWidth>
-        <FullWidth><TF id="hs-open-deals" label="Open Deals" placeholder="e.g. Enterprise license renewal" value={f.v("open_deals")} onChange={f.s("open_deals")} /></FullWidth>
-        <FullWidth><TF id="hs-labels"     label="Labels (comma-separated)" placeholder="enterprise, crm" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
+        <TF id="hs-industry" label="Industry"       placeholder="Professional Services" value={f.v("industry")}  onChange={f.s("industry")} />
+        <TF id="hs-contacts" label="Contacts (comma-separated)" placeholder="Jane (PMO Lead), Tom (IT Director)" value={f.v("contacts")} onChange={f.s("contacts")} />
+        <FullWidth><TAF id="hs-notes" label="Notes" rows={6} placeholder="Expanding Projectplace usage to 3 new teams; evaluating portfolio management add-on…" value={f.v("notes")} onChange={f.s("notes")} /></FullWidth>
+        <FullWidth><TF id="hs-open-deals" label="Open Deals" placeholder="Projectplace Enterprise renewal — Q3 2026" value={f.v("open_deals")} onChange={f.s("open_deals")} /></FullWidth>
+        <FullWidth><TF id="hs-labels"     label="Labels (comma-separated)" placeholder="projectplace, enterprise, renewal" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
       </FormGrid>
       <FormActions>
         <ButtonEmpty onClick={f.reset}>Clear</ButtonEmpty>
@@ -298,15 +298,15 @@ function SlackForm({ onSubmit, submitting }: FormProps) {
   return (
     <FormCard>
       <FormGrid>
-        <TF id="slack-workspace" label="Workspace *" placeholder="acme-corp"       value={f.v("workspace")} onChange={f.s("workspace")} />
-        <TF id="slack-channel"   label="Channel *"   placeholder="incidents"        value={f.v("channel")}   onChange={f.s("channel")} />
+        <TF id="slack-workspace" label="Workspace *" placeholder="planview"           value={f.v("workspace")} onChange={f.s("workspace")} />
+        <TF id="slack-channel"   label="Channel *"   placeholder="pp-product-team"   value={f.v("channel")}   onChange={f.s("channel")} />
         <SF id="slack-chtype"    label="Channel Type" value={f.v("channel_type") || "public"} onChange={f.s("channel_type")} options={CHANNEL_TYPES} />
         <TF id="slack-participants" label="Participants (comma-separated)" placeholder="alice, bob, charlie" value={f.v("participants")} onChange={f.s("participants")} />
-        <FullWidth><TF id="slack-title" label="Thread Title *" placeholder="Embedding service latency spike — 2026-06-01" value={f.v("title")} onChange={f.s("title")} /></FullWidth>
-        <FullWidth><TAF id="slack-messages" label={'Messages * ("username: message", one per line)'} rows={7} placeholder={"alice: Seeing p99 latency > 2s.\nbob: Checking autoscaler logs now."} value={f.v("messages")} onChange={f.s("messages")} /></FullWidth>
-        <TF id="slack-jira" label="Linked Jira Tickets (comma-separated)" placeholder="ENG-123, SUP-456" value={f.v("linked_jira_tickets")} onChange={f.s("linked_jira_tickets")} />
-        <TF id="slack-prs"  label="Linked GitHub PRs (comma-separated)"   placeholder="org/repo#789"     value={f.v("linked_github_prs")}  onChange={f.s("linked_github_prs")} />
-        <FullWidth><TF id="slack-labels" label="Labels (comma-separated)" placeholder="incidents, embeddings" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
+        <FullWidth><TF id="slack-title" label="Thread Title *" placeholder="Card dependency view not loading on Projectplace board — 2026-06-01" value={f.v("title")} onChange={f.s("title")} /></FullWidth>
+        <FullWidth><TAF id="slack-messages" label={'Messages * ("username: message", one per line)'} rows={7} placeholder={"alice: Board stuck loading when project has >200 cards.\nbob: Checking milestone calculation service now."} value={f.v("messages")} onChange={f.s("messages")} /></FullWidth>
+        <TF id="slack-jira" label="Linked Jira Tickets (comma-separated)" placeholder="PP-1042, PP-1055" value={f.v("linked_jira_tickets")} onChange={f.s("linked_jira_tickets")} />
+        <TF id="slack-prs"  label="Linked GitHub PRs (comma-separated)"   placeholder="planview/projectplace#789" value={f.v("linked_github_prs")}  onChange={f.s("linked_github_prs")} />
+        <FullWidth><TF id="slack-labels" label="Labels (comma-separated)" placeholder="projectplace, board, milestone" value={f.v("labels")} onChange={f.s("labels")} /></FullWidth>
       </FormGrid>
       <FormActions>
         <ButtonEmpty onClick={f.reset}>Clear</ButtonEmpty>
@@ -331,17 +331,17 @@ function GitHubForm({ onSubmit, submitting }: FormProps) {
   return (
     <FormCard>
       <FormGrid>
-        <TF id="gh-repo"   label="Repository *" placeholder="acme-corp/search-engine" value={f.v("repo")}   onChange={f.s("repo")} />
+        <TF id="gh-repo"   label="Repository *" placeholder="planview/projectplace-web" value={f.v("repo")}   onChange={f.s("repo")} />
         <SF id="gh-type"   label="Type *"       value={f.v("type") || "pull_request"}  onChange={f.s("type")}  options={TYPES} />
-        <TF id="gh-number" label="Number *"     placeholder="456"                      value={f.v("number")} onChange={f.s("number")} />
+        <TF id="gh-number" label="Number *"     placeholder="2341"                     value={f.v("number")} onChange={f.s("number")} />
         <SF id="gh-state"  label="State"        value={f.v("state") || "open"}         onChange={f.s("state")} options={STATES} />
         <TF id="gh-author" label="Author"       placeholder="alice"                    value={f.v("author")}      onChange={f.s("author")} />
         <TF id="gh-base"   label="Base Branch"  placeholder="main"                     value={f.v("base_branch")} onChange={f.s("base_branch")} />
-        <FullWidth><TF id="gh-title"         label="Title *"             placeholder="Fix embedding dimension mismatch" value={f.v("title")}         onChange={f.s("title")} /></FullWidth>
-        <FullWidth><TAF id="gh-body"         label="Description / Body *" rows={6}     placeholder="What this PR/issue does and why…" value={f.v("body")} onChange={f.s("body")} /></FullWidth>
-        <FullWidth><TF id="gh-labels"        label="Labels (comma-separated)"          placeholder="bug, embeddings"            value={f.v("labels")}        onChange={f.s("labels")} /></FullWidth>
-        <FullWidth><TF id="gh-files-changed" label="Files Changed (comma-separated)"   placeholder="src/embed.py, tests/test_embed.py" value={f.v("files_changed")} onChange={f.s("files_changed")} /></FullWidth>
-        <FullWidth><TAF id="gh-comments"     label={'Comments ("username: comment", one per line)'} rows={3} placeholder={"alice: LGTM\nbob: needs one more test"} value={f.v("comments")} onChange={f.s("comments")} /></FullWidth>
+        <FullWidth><TF id="gh-title"         label="Title *"             placeholder="Fix milestone date recalculation on multi-board projects" value={f.v("title")}         onChange={f.s("title")} /></FullWidth>
+        <FullWidth><TAF id="gh-body"         label="Description / Body *" rows={6}     placeholder="Describes the board, card, or milestone behaviour being fixed and why…" value={f.v("body")} onChange={f.s("body")} /></FullWidth>
+        <FullWidth><TF id="gh-labels"        label="Labels (comma-separated)"          placeholder="projectplace, board, milestone"   value={f.v("labels")}        onChange={f.s("labels")} /></FullWidth>
+        <FullWidth><TF id="gh-files-changed" label="Files Changed (comma-separated)"   placeholder="src/board/milestone.ts, tests/milestone.test.ts" value={f.v("files_changed")} onChange={f.s("files_changed")} /></FullWidth>
+        <FullWidth><TAF id="gh-comments"     label={'Comments ("username: comment", one per line)'} rows={3} placeholder={"alice: LGTM — tested on Q3 roadmap board\nbob: needs a test for >500 card projects"} value={f.v("comments")} onChange={f.s("comments")} /></FullWidth>
       </FormGrid>
       <FormActions>
         <ButtonEmpty onClick={f.reset}>Clear</ButtonEmpty>

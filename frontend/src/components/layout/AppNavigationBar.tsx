@@ -8,12 +8,11 @@ import {
   ToolbarSectionRight,
   UserMenu,
 } from "@planview/pv-toolbar";
-import { Notification, Settings, Help, Support, Logout, LogoProjectplace, PlusCircleFilled } from "@planview/pv-icons";
+import { Notification, Settings, Help, Support, Logout, LogoProjectplace } from "@planview/pv-icons";
 import { Avatar, ListItem } from "@planview/pv-uikit";
 import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import SearchPanel from "../documents/search/SearchPanel";
-import AddSources from "../Sources";
 
 const NavButton = styled(ToolbarButtonEmptyInverse)<{ $active?: boolean }>`
   border-bottom: 2px solid ${({ $active }) => ($active ? "rgba(255,255,255,0.9)" : "transparent")};
@@ -28,7 +27,6 @@ export default function AppNavigationBar() {
   const { logout } = useAuthStore();
   const [searchActive, setSearchActive] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [isDocumentOpen, setIsDocumentOpen] = useState(false)
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -40,9 +38,6 @@ export default function AppNavigationBar() {
     <>
       <NavigationBar aria-label="Main navigation" logo={<LogoProjectplace title="Planview Advisor" />}>
         <ToolbarSectionLeft>
-          <NavButton icon={<PlusCircleFilled />} onClick={() => {setIsDocumentOpen(true)}}>
-            Add
-          </NavButton>
           <NavButton $active={isActive("/")} onClick={() => navigate("/")}>
             Overview
           </NavButton>
@@ -87,11 +82,6 @@ export default function AppNavigationBar() {
           }}
         />
       ) : null}
-      {isDocumentOpen && (
-        <AddSources
-          onClose={() => setIsDocumentOpen(false)}
-        />
-      )}
     </>
   );
 }

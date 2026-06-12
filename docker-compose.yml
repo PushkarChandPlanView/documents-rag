@@ -91,6 +91,8 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    command: >
+      bash -c "rm -rf /var/lib/kafka/data/* && /etc/confluent/docker/run"
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks: [internal]
@@ -520,6 +522,8 @@ services:
     restart: unless-stopped
     environment:
       AGENT_SERVICE_URL: http://agent_service:8002
+    ports:
+      - "127.0.0.1:5001:5001"
     depends_on:
       agent_service:
         condition: service_healthy

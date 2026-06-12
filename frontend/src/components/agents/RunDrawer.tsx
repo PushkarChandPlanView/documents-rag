@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import styled from "styled-components";
 import { color, spacing, text } from "@planview/pv-utilities";
 import { ButtonEmpty, ButtonPrimary } from "@planview/pv-uikit";
@@ -87,11 +89,13 @@ const PlanStep = styled.div<{ $state: "pending" | "running" | "done" | "error" }
     $state === "running"
       ? color.textLinkNormal
       : $state === "done"
-      ? color.textSuccess
-      : $state === "error"
-      ? "#c62828"
-      : color.textSecondary};
-  &:last-child { border-bottom: none; }
+        ? color.textSuccess
+        : $state === "error"
+          ? "#c62828"
+          : color.textSecondary};
+  &:last-child {
+    border-bottom: none;
+  }
 `;
 
 const StepDot = styled.div<{ $state: "pending" | "running" | "done" | "error" }>`
@@ -101,23 +105,22 @@ const StepDot = styled.div<{ $state: "pending" | "running" | "done" | "error" }>
   flex-shrink: 0;
   margin-top: 1px;
   background: ${({ $state }) =>
-    $state === "running" ? "#e3f2fd"
-    : $state === "done"  ? "#e8f5e9"
-    : $state === "error" ? "#ffebee"
-    : "#f0f0f0"};
+    $state === "running" ? "#e3f2fd" : $state === "done" ? "#e8f5e9" : $state === "error" ? "#ffebee" : "#f0f0f0"};
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 9px;
   color: ${({ $state }) =>
-    $state === "running" ? "#1565c0"
-    : $state === "done"  ? "#2e7d32"
-    : $state === "error" ? "#c62828"
-    : "#aaa"};
+    $state === "running" ? "#1565c0" : $state === "done" ? "#2e7d32" : $state === "error" ? "#c62828" : "#aaa"};
   animation: ${({ $state }) => ($state === "running" ? "pulseDot 1s ease-in-out infinite" : "none")};
   @keyframes pulseDot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
   }
 `;
 
@@ -146,22 +149,83 @@ const GeneratingRow = styled.div`
   padding: 4px 0;
   animation: fadePulse 1.4s ease-in-out infinite;
   @keyframes fadePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.45; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
   }
 `;
 
 const AnswerBox = styled.div`
-  background: #f5f8ff;
-  border: 1px solid #c5d8f5;
-  border-radius: 6px;
   padding: ${spacing.small}px ${spacing.medium}px;
   font-size: 12px;
   color: ${color.textPrimary};
   line-height: 1.65;
-  white-space: pre-wrap;
   word-break: break-word;
   min-height: 60px;
+
+  p {
+    margin: 0 0 6px;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    margin: 8px 0 4px;
+  }
+  ul,
+  ol {
+    margin: 0 0 6px;
+    padding-left: 18px;
+  }
+  li {
+    margin-bottom: 2px;
+  }
+  code {
+    font-family: monospace;
+    font-size: 0.85em;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 3px;
+    padding: 0.1em 0.3em;
+  }
+  pre {
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    margin: 0 0 6px;
+  }
+  blockquote {
+    border-left: 3px solid #c5d8f5;
+    padding-left: 8px;
+    color: ${color.textSecondary};
+    margin: 0 0 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 6px;
+  }
+  th {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 2px solid #c5d8f5;
+    font-weight: 600;
+  }
+  td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e0eaf8;
+  }
+  strong {
+    font-weight: 600;
+  }
 `;
 
 const SuccessBanner = styled.div`
@@ -253,23 +317,14 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
     setErrorMsg("");
 
     try {
-      const stream = agentsApi.streamRun(
-        agent.id,
-        query.trim(),
-        userEmail ?? "",
-        ctrl.signal
-      );
+      const stream = agentsApi.streamRun(agent.id, query.trim(), userEmail ?? "", ctrl.signal);
 
       for await (const event of stream) {
         switch (event.type) {
           case "plan":
-            setPlanSteps(
-              event.steps.map((s) => ({ text: s, state: "pending", sources: [] }))
-            );
+            setPlanSteps(event.steps.map((s) => ({ text: s, state: "pending", sources: [] })));
             // mark first step as running
-            setPlanSteps((prev) =>
-              prev.map((s, i) => (i === 0 ? { ...s, state: "running" } : s))
-            );
+            setPlanSteps((prev) => prev.map((s, i) => (i === 0 ? { ...s, state: "running" } : s)));
             break;
 
           case "step_done":
@@ -288,15 +343,13 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
                   return { ...s, state: "running" };
                 }
                 return s;
-              })
+              }),
             );
             break;
 
           case "generating":
             // all steps done — show generating state
-            setPlanSteps((prev) =>
-              prev.map((s) => (s.state === "running" ? { ...s, state: "done" } : s))
-            );
+            setPlanSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "done" } : s)));
             setView("generating");
             break;
 
@@ -321,17 +374,13 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
 
           case "done":
             if (event.document_id) setResultDocId(event.document_id);
-            setPlanSteps((prev) =>
-              prev.map((s) => (s.state === "running" ? { ...s, state: "done" } : s))
-            );
+            setPlanSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "done" } : s)));
             setView("done");
             break;
 
           case "error":
             setErrorMsg(event.content);
-            setPlanSteps((prev) =>
-              prev.map((s) => (s.state === "running" ? { ...s, state: "error" } : s))
-            );
+            setPlanSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "error" } : s)));
             setView("error");
             break;
         }
@@ -362,21 +411,39 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
       <DrawerHeader>
         <AiAnvi />
         <DrawerTitle>Run — {agent.name}</DrawerTitle>
-        <ButtonEmpty
-          icon={<CrossCircleFilled />}
-          tooltip="Close"
-          onClick={onClose}
-          aria-label="Close run drawer"
-        />
+        <ButtonEmpty icon={<CrossCircleFilled />} tooltip="Close" onClick={onClose} aria-label="Close run drawer" />
       </DrawerHeader>
 
       <DrawerBody>
+        {view === "done" && resultDocId && (
+          <SuccessBanner>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <CheckmarkCircleFilled />
+              Result saved as document
+            </div>
+            <SuccessLinks>
+              <DocLink href={`/agent-ui/api/runs/${resultDocId}`} target="_blank" rel="noreferrer" download>
+                Download ↓
+              </DocLink>
+              <DocLink
+                href="/search"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = `/search?doc=${resultDocId}`;
+                }}
+              >
+                Open in Search ↗
+              </DocLink>
+              <DocLink href="/documents">Manage ↗</DocLink>
+            </SuccessLinks>
+          </SuccessBanner>
+        )}
         {/* ── IDLE ── */}
         {view === "idle" && (
           <>
             <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>
-              Enter a query and run the agent. It will plan its search steps,
-              retrieve context from connected sources, and stream an answer.
+              Enter a query and run the agent. It will plan its search steps, retrieve context from connected sources,
+              and stream an answer.
             </div>
             <QueryRow>
               <div style={{ flex: 1 }}>
@@ -398,9 +465,7 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
         {isActive && (
           <>
             {/* Query recap */}
-            <div style={{ fontSize: 11, color: color.textSecondary, fontStyle: "italic" }}>
-              "{query}"
-            </div>
+            <div style={{ fontSize: 11, color: color.textSecondary, fontStyle: "italic" }}>"{query}"</div>
 
             {/* Plan checklist */}
             {planSteps.length > 0 && (
@@ -410,19 +475,14 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
                   {planSteps.map((s, i) => (
                     <PlanStep key={i} $state={s.state}>
                       <StepDot $state={s.state}>
-                        {s.state === "done" ? "✓"
-                         : s.state === "running" ? "…"
-                         : s.state === "error" ? "✗"
-                         : "○"}
+                        {s.state === "done" ? "✓" : s.state === "running" ? "…" : s.state === "error" ? "✗" : "○"}
                       </StepDot>
                       <span style={{ flex: 1 }}>
                         {s.text}
                         {s.sources.map((src) => (
                           <SourceBadge key={src}>{src}</SourceBadge>
                         ))}
-                        {s.chunks !== undefined && (
-                          <ChunksNote>{s.chunks} chunks</ChunksNote>
-                        )}
+                        {s.chunks !== undefined && <ChunksNote>{s.chunks} chunks</ChunksNote>}
                       </span>
                     </PlanStep>
                   ))}
@@ -442,7 +502,9 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
             {answer && (
               <>
                 <SubLabel>Answer</SubLabel>
-                <AnswerBox>{answer}</AnswerBox>
+                <AnswerBox>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+                </AnswerBox>
               </>
             )}
 
@@ -476,30 +538,6 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
             )}
 
             {/* Document success banner */}
-            {view === "done" && resultDocId && (
-              <SuccessBanner>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <CheckmarkCircleFilled />
-                  Result saved as document
-                </div>
-                <SuccessLinks>
-                  <DocLink
-                    href={`/agent-ui/api/runs/${resultDocId}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                  >
-                    Download ↓
-                  </DocLink>
-                  <DocLink href="/search" onClick={(e) => { e.preventDefault(); window.location.href = `/search?doc=${resultDocId}`; }}>
-                    Open in Search ↗
-                  </DocLink>
-                  <DocLink href="/documents">
-                    Manage ↗
-                  </DocLink>
-                </SuccessLinks>
-              </SuccessBanner>
-            )}
           </>
         )}
 
@@ -512,9 +550,7 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
                 <PlanList>
                   {planSteps.map((s, i) => (
                     <PlanStep key={i} $state={s.state}>
-                      <StepDot $state={s.state}>
-                        {s.state === "done" ? "✓" : s.state === "error" ? "✗" : "○"}
-                      </StepDot>
+                      <StepDot $state={s.state}>{s.state === "done" ? "✓" : s.state === "error" ? "✗" : "○"}</StepDot>
                       <span style={{ flex: 1 }}>{s.text}</span>
                     </PlanStep>
                   ))}
@@ -543,12 +579,8 @@ export function RunDrawer({ agent, onClose, initialQuery }: Props) {
         ) : (
           <>
             <ButtonEmpty onClick={onClose}>Close</ButtonEmpty>
-            {(view === "done" || view === "error") && (
-              <ButtonPrimary onClick={resetRun}>Run again</ButtonPrimary>
-            )}
-            {(view === "running" || view === "generating") && (
-              <ButtonEmpty onClick={resetRun}>Cancel</ButtonEmpty>
-            )}
+            {(view === "done" || view === "error") && <ButtonPrimary onClick={resetRun}>Run again</ButtonPrimary>}
+            {(view === "running" || view === "generating") && <ButtonEmpty onClick={resetRun}>Cancel</ButtonEmpty>}
           </>
         )}
       </DrawerFooter>

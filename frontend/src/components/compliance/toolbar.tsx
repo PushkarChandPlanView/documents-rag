@@ -55,7 +55,9 @@ export function ComplianceToolbar({
       <ToolbarSectionLeft>
         <Title>Compliance</Title>
         <ToolbarSeparator />
-        <ButtonEmpty onClick={onAddRule}>+ Add Rule</ButtonEmpty>
+        {isAdmin ? (
+          <ButtonEmpty onClick={onAddRule}>+ Add Rule</ButtonEmpty>
+        ) : null}
         <ToolbarSeparator />
         {isDirty && (
           <DirtyBadge>

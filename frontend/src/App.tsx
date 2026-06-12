@@ -16,10 +16,11 @@ import { SearchBar } from "./components/search/SearchBar";
 import SourceConfig from "./pages/SourceConfig";
 import Agents from "./pages/Agents";
 import Layout from "./components/layout/Layout";
-
+import { MessageCenter } from '@planview/pv-uikit'
 export default function App() {
   return (
     <IntlProvider locale={navigator.language} defaultLocale="en" messages={{ ...toolbarMessages, ...gridMessages, ...filterMessages, ...uikitMessages, ...detailsMessages }}>
+      <MessageCenter />
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>

@@ -47,7 +47,7 @@ const ErrorMsg = styled.p`
   color: ${color.error400};
   text-align: center;
 `;
-const ACTIONABLE_RE = /\b(update|add|remove|rewrite|change|modify|edit|fix|delete|replace|insert|correct|implement|create|refactor|improve|resolve|apply)\b/i;
+import { isActionable } from "../../../actionable";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -176,6 +176,7 @@ const CommentsTab = ({ documentId }: Props) => {
         onStatusChange={() => setImplementProposal(null)}
       />
     )}
+    {implementing && <Empty>Generating edit preview…</Empty>}
     <Wrapper>
       {/* ── Composer (hidden while editing an existing comment) ── */}
       {editingId === null && (
@@ -217,11 +218,11 @@ const CommentsTab = ({ documentId }: Props) => {
             moreMenuItems={
               item.author.id === userId
                 ? [
-                    ...(ACTIONABLE_RE.test(stripHtml(item.content)) ? [<ListItem key="ai" label="Implement" icon={<AiAnvi color="anvi" />} onActivate={() => handleImplement(stripHtml(item.content))} />] : []),
+                    ...(isActionable(stripHtml(item.content)) ? [<ListItem key="ai" label="Implement" icon={<AiAnvi color="anvi" />} onActivate={() => handleImplement(stripHtml(item.content))} />] : []),
                     <ListItem key="edit" label="Edit" icon={<Edit />} onActivate={() => setEditingId(item.id)} />,
                     <ListItem key="delete" label="Delete" icon={<Trash />} onActivate={() => deleteComment(item.id)} />,
                   ]
-                : ACTIONABLE_RE.test(stripHtml(item.content)) ? [<ListItem key="ai" label="Implement" icon={<AiAnvi color="anvi" />} onActivate={() => handleImplement(stripHtml(item.content))} />] : undefined
+                : isActionable(stripHtml(item.content)) ? [<ListItem key="ai" label="Implement" icon={<AiAnvi color="anvi" />} onActivate={() => handleImplement(stripHtml(item.content))} />] : undefined
             }
           />
         ),

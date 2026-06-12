@@ -7,6 +7,7 @@ import { editsApi } from "@/api/edits";
 import type { ChatMessage } from "@/types";
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
+import { isActionable } from "@/actionable";
 
 const WindowWrapper = styled.div`
   display: flex;
@@ -62,7 +63,7 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
         ]);
       }
     }).catch(() => {
-      // silently ignore — chat still works without a summary
+      // Document not found or unavailable — start with empty chat
     });
   }, [documentId]);
 
@@ -70,7 +71,6 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const EDIT_INTENT_RE = /\b(update|add|remove|rewrite|change|modify|edit|fix|delete|replace|insert|correct)\b/i;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -87,7 +87,7 @@ export function ChatWindow({ documentId, documentName }: ChatWindowProps) {
     setStreaming(true);
 
     // ── Edit intent: call the edit API instead of the chat stream ────────────
-    if (documentId && EDIT_INTENT_RE.test(userMsg.content)) {
+    if (documentId && isActionable(userMsg.content)) {
       const pendingMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "edit_proposal",
